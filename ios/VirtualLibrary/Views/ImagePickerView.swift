@@ -1,5 +1,4 @@
 import SwiftUI
-import PhotosUI
 
 struct ImagePickerView: UIViewControllerRepresentable {
     let onImageSelected: (UIImage) -> Void
