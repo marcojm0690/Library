@@ -1,0 +1,19 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXFileReference section */
+		App = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualLibraryApp.swift; sourceTree = "<group>"; };
+		Models = {isa = PBXFileReference; lastKnownFileType = folder; path = Models; sourceTree = "<group>"; };
+		ViewModels = {isa = PBXFileReference; lastKnownFileType = folder; path = ViewModels; sourceTree = "<group>"; };
+		Views = {isa = PBXFileReference; lastKnownFileType = folder; path = Views; sourceTree = "<group>"; };
+		Services = {isa = PBXFileReference; lastKnownFileType = folder; path = Services; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+	};
+	rootObject = ProjectRoot /* Project object */;
+}
