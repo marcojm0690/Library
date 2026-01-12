@@ -12,11 +12,11 @@ struct HomeView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.blue)
                     
-                    Text("Virtual Library")
+                    Text("Biblioteca Virtual")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
-                    Text("Identify books by scanning")
+                    Text("Identifica y agrega libros a su biblioteca")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -25,19 +25,33 @@ struct HomeView: View {
                 Spacer()
                 
                 // Navigation options
-                VStack(spacing: 20) {
+                VStack(spacing: 15) {
                     NavigationLink(destination: ScanIsbnView()) {
                         FeatureButton(
                             icon: "barcode.viewfinder",
-                            title: "Scan ISBN Barcode",
-                            description: "Use camera to scan book barcode"
+                            title: "Escanear ISBN ",
+                            description: "Use la camara para escanear código de barras"
                         )
                     }
                     
                     NavigationLink(destination: ScanCoverView()) {
                         FeatureButton(
                             icon: "doc.text.viewfinder",
-                            title: "Scan Book Cover",
+                            title: "Escanear cubierta",
+                            description: "Use OCR to identify from cover"
+                        )
+                    }
+                    NavigationLink(destination: ScanCoverView()) {
+                        FeatureButton(
+                            icon: "doc.text.viewfinder",
+                            title: "Crear biblioteca",
+                            description: "Use OCR to identify from cover"
+                        )
+                    }
+                    NavigationLink(destination: ScanCoverView()) {
+                        FeatureButton(
+                            icon: "doc.text.viewfinder",
+                            title: "Ver biblioteca",
                             description: "Use OCR to identify from cover"
                         )
                     }

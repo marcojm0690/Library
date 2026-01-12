@@ -52,3 +52,19 @@ public record SearchBooksResponse
     public List<BookResponse> Books { get; init; } = new();
     public int TotalResults { get; init; }
 }
+
+/// <summary>
+/// Request DTO for identifying books from cover images
+/// </summary>
+public record IdentifyBookByImageRequest
+{
+    /// <summary>
+    /// Base64-encoded image data or image bytes
+    /// </summary>
+    public string ImageData { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Image format (e.g., "jpg", "png")
+    /// </summary>
+    public string ImageFormat { get; init; } = "jpg";
+}

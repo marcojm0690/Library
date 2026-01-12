@@ -6,7 +6,6 @@ import AVFoundation
 struct ScanIsbnView: View {
     @StateObject private var viewModel = ScanIsbnViewModel()
     @StateObject private var cameraService = CameraService()
-    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         ZStack {
@@ -96,7 +95,7 @@ struct ScanIsbnView: View {
         }
         .navigationTitle("ISBN Scanner")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: cameraService.scannedISBN) { _, newValue in
+        .onChange(of: cameraService.scannedISBN) { newValue in
             if let isbn = newValue {
                 Task {
                     await viewModel.lookupBook(isbn: isbn)

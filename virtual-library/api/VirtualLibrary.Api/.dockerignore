@@ -1,0 +1,11 @@
+bin/
+obj/
+.vscode/
+.git/
+.gitignore
+*.user
+*.swp
+**/*.md
+# You typically inject secrets via env vars in Azure; avoid baking sensitive configs
+# appsettings.Development.json excluded by default
+appsettings.Development.json

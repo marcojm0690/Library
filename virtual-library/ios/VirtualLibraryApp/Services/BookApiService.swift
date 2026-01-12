@@ -13,9 +13,13 @@ class BookApiService: ObservableObject {
     @Published var isLoading = false
     
     /// Initialize with custom base URL
-    /// - Parameter baseURL: The API base URL (default: localhost for development)
-    init(baseURL: String = "http://localhost:5000") {
-        self.baseURL = baseURL
+    /// - Parameter baseURL: The API base URL (automatically selects simulator or device URL)
+    init(baseURL: String? = nil) {
+        #if targetEnvironment(simulator)
+        self.baseURL = baseURL ?? "http://localhost:5001"
+        #else
+        self.baseURL = baseURL ?? "http://192.168.1.81:5001"
+        #endif
     }
     
     /// Look up a book by ISBN

@@ -1,0 +1,50 @@
+name: Deploy Web App (Container)
+
+on:
+  workflow_dispatch:
+    inputs:
+      imageTag:
+        description: "Image tag to deploy (default: commit SHA)"
+        required: false
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: virtual-library-api
+      RESOURCE_GROUP: VirtualLibraryRG
+      LOCATION: eastus
+      PLAN_NAME: vl-asp-linux
+      WEBAPP_NAME: virtual-library-api-web
+      IMAGE_TAG: ${{ github.event.inputs.imageTag || github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Web App
+        env:
+          RG: ${{ env.RESOURCE_GROUP }}
+          LOCATION: ${{ env.LOCATION }}
+          PLAN_NAME: ${{ env.PLAN_NAME }}
+          WEBAPP_NAME: ${{ env.WEBAPP_NAME }}
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_STORAGE_CONTAINER_NAME: user-libraries
+          AZURE_VISION_ENDPOINT: ${{ secrets.AZURE_VISION_ENDPOINT }}
+          AZURE_VISION_APIKEY: ${{ secrets.AZURE_VISION_APIKEY }}
+        run: |
+          chmod +x ./scripts/deploy-webapp.sh
+          ./scripts/deploy-webapp.sh

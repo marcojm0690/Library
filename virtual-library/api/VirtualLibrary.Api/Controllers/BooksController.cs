@@ -1,13 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using VirtualLibrary.Api.Application.Books.SearchByIsbn;
 using VirtualLibrary.Api.Application.Books.SearchByCover;
+using VirtualLibrary.Api.Application.Books.SearchByImage;
 using VirtualLibrary.Api.Application.DTOs;
+using VirtualLibrary.Api.Infrastructure.External;
+using VirtualLibrary.Api.Infrastructure.Persistence;
 
 namespace VirtualLibrary.Api.Controllers;
 
 /// <summary>
 /// API controller for book-related operations.
-/// Provides endpoints for ISBN lookup and cover-based search.
+/// Provides endpoints for ISBN lookup, cover-based search, and image-based identification.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -15,15 +18,21 @@ public class BooksController : ControllerBase
 {
     private readonly SearchByIsbnService _searchByIsbnService;
     private readonly SearchByCoverService _searchByCoverService;
+    private readonly SearchByImageService _searchByImageService;
+    private readonly AzureBlobLibraryRepository _libraryRepository;
     private readonly ILogger<BooksController> _logger;
 
     public BooksController(
         SearchByIsbnService searchByIsbnService,
         SearchByCoverService searchByCoverService,
+        SearchByImageService searchByImageService,
+        AzureBlobLibraryRepository libraryRepository,
         ILogger<BooksController> logger)
     {
         _searchByIsbnService = searchByIsbnService;
         _searchByCoverService = searchByCoverService;
+        _searchByImageService = searchByImageService;
+        _libraryRepository = libraryRepository;
         _logger = logger;
     }
 
@@ -75,5 +84,131 @@ public class BooksController : ControllerBase
         var result = await _searchByCoverService.ExecuteAsync(request.ExtractedText);
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Identify a book from a cover image using Azure Computer Vision.
+    /// </summary>
+    /// <param name="request">Request containing Base64-encoded image data</param>
+    /// <returns>Identified book information</returns>
+    [HttpPost("identify-from-image")]
+    [ProducesResponseType(typeof(BookResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> IdentifyFromImage([FromBody] IdentifyBookByImageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ImageData))
+        {
+            return BadRequest(new { error = "Image data is required" });
+        }
+
+        try
+        {
+            _logger.LogInformation("Book identification request from image");
+
+            // Convert Base64 to stream
+            var imageBytes = Convert.FromBase64String(request.ImageData);
+            using var imageStream = new MemoryStream(imageBytes);
+
+            var book = await _searchByImageService.IdentifyBookAsync(imageStream);
+
+            if (book == null)
+            {
+                return BadRequest(new { error = "Could not identify book from the provided image" });
+            }
+
+            var response = new BookResponse
+            {
+                Id = book.Id,
+                Title = book.Title,
+                Authors = book.Authors,
+                Description = book.Description,
+                Source = "Azure Vision"
+            };
+
+            return Ok(response);
+        }
+        catch (FormatException)
+        {
+            return BadRequest(new { error = "Invalid Base64 image data" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error identifying book from image");
+            return StatusCode(500, new { error = "Error processing image", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Save a book to the user's library in Azure Blob Storage.
+    /// </summary>
+    /// <param name="userId">The user identifier</param>
+    /// <param name="book">Book information to save</param>
+    /// <returns>Success message</returns>
+    [HttpPost("library/{userId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SaveToLibrary([FromRoute] string userId, [FromBody] BookResponse book)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return BadRequest(new { error = "User ID is required" });
+        }
+
+        try
+        {
+            // For this simple example, we'll save the book data
+            // In production, you'd want to manage a user's library collection
+            var libraryJson = System.Text.Json.JsonSerializer.Serialize(new { book, savedAt = DateTime.UtcNow });
+            
+            var saved = await _libraryRepository.SaveUserLibraryAsync(userId, libraryJson);
+
+            if (saved)
+            {
+                return Ok(new { message = "Book saved to library successfully", userId });
+            }
+            else
+            {
+                return StatusCode(500, new { error = "Failed to save book to library" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving book to library");
+            return StatusCode(500, new { error = "Error saving to library", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get the user's library from Azure Blob Storage.
+    /// </summary>
+    /// <param name="userId">The user identifier</param>
+    /// <returns>User's library data</returns>
+    [HttpGet("library/{userId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserLibrary([FromRoute] string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return BadRequest(new { error = "User ID is required" });
+        }
+
+        try
+        {
+            var libraryJson = await _libraryRepository.GetUserLibraryAsync(userId);
+
+            if (libraryJson == null)
+            {
+                return NotFound(new { error = "Library not found for user", userId });
+            }
+
+            return Ok(new { data = libraryJson, userId });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user library");
+            return StatusCode(500, new { error = "Error retrieving library", details = ex.Message });
+        }
     }
 }
