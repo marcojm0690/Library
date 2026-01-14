@@ -30,7 +30,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./virtual-library/api/VirtualLibrary.Api/Dockerfile
+          file: ./Dockerfile
           push: true
           tags: |
             ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}

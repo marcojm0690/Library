@@ -13,7 +13,7 @@ variables:
   dockerRegistryServiceConnection: 'virtuallibraryacr'
   imageRepository: 'virtual-library-api'
   containerRegistry: 'virtuallibraryacr.azurecr.io'
-  dockerfilePath: '$(Build.SourcesDirectory)/virtual-library/api/VirtualLibrary.Api/Dockerfile'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
   tag: '$(Build.BuildId)'
   vmImageName: 'ubuntu-latest'
 
@@ -34,7 +34,7 @@ stages:
     
     - script: |
         docker build \
-          -f virtual-library/api/VirtualLibrary.Api/Dockerfile \
+          -f Dockerfile \
           -t $(containerRegistry)/$(imageRepository):$(tag) \
           -t $(containerRegistry)/$(imageRepository):latest \
           .
