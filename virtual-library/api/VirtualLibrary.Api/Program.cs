@@ -39,6 +39,9 @@ if (!string.IsNullOrEmpty(cosmosDbEndpoint))
 
     builder.Services.AddScoped<IBookRepository>(sp =>
         sp.GetRequiredService<CosmosDbBookRepository>());
+
+    // Register seeder for development/testing
+    builder.Services.AddScoped<CosmosDbSeeder>();
 }
 else
 {
@@ -62,6 +65,28 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Seed Cosmos DB with mock data if configured
+if (!string.IsNullOrEmpty(cosmosDbEndpoint))
+{
+    try
+    {
+        var seedMockData = cosmosDbConfig.GetValue<bool>("SeedMockData");
+        if (seedMockData)
+        {
+            using (var scope = app.Services.CreateScope())
+            {
+                var seeder = scope.ServiceProvider.GetRequiredService<CosmosDbSeeder>();
+                await seeder.SeedIfEmptyAsync();
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Failed to seed Cosmos DB. Continuing with application startup.");
+    }
+}
 
 // Configure the HTTP request pipeline.
 app.UseSwagger();
