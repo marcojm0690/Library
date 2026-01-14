@@ -9,7 +9,8 @@ resources:
 - repo: self
 
 variables:
-  dockerRegistryServiceConnection: 'virtuallibraryacr' # Set this in Azure DevOps
+  # Update this to match your service connection name in Azure DevOps
+  dockerRegistryServiceConnection: 'virtuallibraryacr'
   imageRepository: 'virtual-library-api'
   containerRegistry: 'virtuallibraryacr.azurecr.io'
   dockerfilePath: '$(Build.SourcesDirectory)/virtual-library/api/VirtualLibrary.Api/Dockerfile'
