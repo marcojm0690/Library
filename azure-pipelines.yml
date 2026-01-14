@@ -33,7 +33,7 @@ stages:
         repository: $(imageRepository)
         dockerfile: $(dockerfilePath)
         containerRegistry: $(dockerRegistryServiceConnection)
-        buildContext: '$(Build.SourcesDirectory)'
+        buildContext: $(Build.SourcesDirectory)
         tags: |
           $(tag)
           latest
