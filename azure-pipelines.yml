@@ -27,13 +27,18 @@ stages:
       vmImage: $(vmImageName)
     steps:
     - task: Docker@2
-      displayName: Build and push image to ACR
+      displayName: Login to ACR
       inputs:
-        command: buildAndPush
-        repository: $(imageRepository)
-        dockerfile: $(dockerfilePath)
+        command: login
         containerRegistry: $(dockerRegistryServiceConnection)
-        buildContext: $(Build.SourcesDirectory)
-        tags: |
-          $(tag)
-          latest
+    
+    - script: |
+        docker build \
+          -f virtual-library/api/VirtualLibrary.Api/Dockerfile \
+          -t $(containerRegistry)/$(imageRepository):$(tag) \
+          -t $(containerRegistry)/$(imageRepository):latest \
+          .
+        docker push $(containerRegistry)/$(imageRepository):$(tag)
+        docker push $(containerRegistry)/$(imageRepository):latest
+      displayName: 'Build and push Docker image'
+      workingDirectory: $(Build.SourcesDirectory)
