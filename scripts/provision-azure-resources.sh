@@ -20,6 +20,7 @@ RG=${RG:-"VirtualLibraryRG"}
 LOCATION=${LOCATION:-"canadacentral"}
 ACR_NAME=${ACR_NAME:-"virtuallibraryacr"}
 STORAGE_ACCOUNT_NAME=${STORAGE_ACCOUNT_NAME:-"vllibrarystorage$(date +%s | tail -c 5)"}
+COSMOS_ACCOUNT_NAME=${COSMOS_ACCOUNT_NAME:-"virtuallibrary-server"}
 PLAN_NAME=${PLAN_NAME:-"vl-asp-linux"}
 WEBAPP_NAME=${WEBAPP_NAME:-"virtual-library-api-web"}
 VISION_NAME=${VISION_NAME:-"vl-vision-$(date +%s | tail -c 5)"}
@@ -29,6 +30,7 @@ echo "  Resource Group: $RG"
 echo "  Location: $LOCATION"
 echo "  ACR Name: $ACR_NAME"
 echo "  Storage Account: $STORAGE_ACCOUNT_NAME"
+echo "  Cosmos DB Account: $COSMOS_ACCOUNT_NAME"
 echo "  App Service Plan: $PLAN_NAME"
 echo "  Web App: $WEBAPP_NAME"
 echo "  Vision Service: $VISION_NAME"
@@ -77,7 +79,26 @@ az storage container create \
   --only-show-errors || true
 echo -e "${GREEN}✓ Blob Container ready${NC}"
 
-# Step 5: Create Azure Cognitive Services (Vision)
+# Step 5: Create Cosmos DB Account (SQL API)
+echo -e "${YELLOW}5. Creating Azure Cosmos DB Account...${NC}"
+if az cosmosdb show -n "$COSMOS_ACCOUNT_NAME" -g "$RG" >/dev/null 2>&1; then
+  echo -e "${GREEN}✓ Cosmos DB Account already exists${NC}"
+else
+  az cosmosdb create \
+    -g "$RG" \
+    -n "$COSMOS_ACCOUNT_NAME" \
+    --kind GlobalDocumentDB \
+    --locations regionName="$LOCATION" failoverPriority=0 \
+    --default-consistency-level "Session" \
+    --only-show-errors
+  echo -e "${GREEN}✓ Cosmos DB Account created${NC}"
+fi
+
+# Get Cosmos DB endpoint
+COSMOS_ENDPOINT=$(az cosmosdb show -n "$COSMOS_ACCOUNT_NAME" -g "$RG" --query "documentEndpoint" -o tsv)
+echo -e "${GREEN}Cosmos DB Endpoint: $COSMOS_ENDPOINT${NC}"
+
+# Step 6: Create Azure Cognitive Services (Vision)
 echo -e "${YELLOW}5. Creating Azure Cognitive Services (Vision API)...${NC}"
 if az cognitiveservices account show -n "$VISION_NAME" -g "$RG" >/dev/null 2>&1; then
   echo -e "${GREEN}✓ Vision Service already exists${NC}"
@@ -163,6 +184,15 @@ az role assignment create \
   --scope "$VISION_ID" \
   --only-show-errors || true
 
+# Cosmos DB Built-in Data Contributor role
+COSMOS_ID=$(az cosmosdb show -n "$COSMOS_ACCOUNT_NAME" -g "$RG" --query id -o tsv)
+echo "  Granting Cosmos DB Built-in Data Contributor..."
+az role assignment create \
+  --assignee "$PRINCIPAL_ID" \
+  --role "Cosmos DB Built-in Data Contributor" \
+  --scope "$COSMOS_ID" \
+  --only-show-errors || true
+
 echo -e "${GREEN}✓ RBAC roles assigned${NC}"
 
 # Step 10: Summary
@@ -178,14 +208,19 @@ echo "   - ACR_LOGIN_SERVER = $ACR_NAME.azurecr.io"
 echo "   - STORAGE_ACCOUNT_NAME = $STORAGE_ACCOUNT_NAME"
 echo "   - AZURE_VISION_ENDPOINT = $VISION_ENDPOINT"
 echo ""
-echo "2. Or set Azure DevOps Variables for deployment script:"
+echo "3. Or set Azure DevOps Variables for deployment script:"
 echo "   - ACR_NAME = $ACR_NAME"
 echo "   - STORAGE_ACCOUNT_NAME = $STORAGE_ACCOUNT_NAME"
+echo "   - COSMOS_ACCOUNT_NAME = $COSMOS_ACCOUNT_NAME"
+echo "   - COSMOS_ENDPOINT = $COSMOS_ENDPOINT"
 echo "   - VISION_ENDPOINT = $VISION_ENDPOINT"
 echo ""
 echo "3. Configure app settings (values will be set by deploy script with Managed Identity):"
 echo "   - Azure__Storage__AccountName = $STORAGE_ACCOUNT_NAME"
 echo "   - Azure__Storage__ContainerName = user-libraries"
+echo "   - Azure__CosmosDb__Endpoint = $COSMOS_ENDPOINT"
+echo "   - Azure__CosmosDb__DatabaseName = LibraryDb"
+echo "   - Azure__CosmosDb__ContainerName = Books"
 echo "   - Azure__Vision__Endpoint = $VISION_ENDPOINT"
 echo ""
 echo "4. Build and push your Docker image:"
@@ -195,6 +230,7 @@ echo "5. Deploy the Web App:"
 echo "   RG=$RG LOCATION=$LOCATION PLAN_NAME=$PLAN_NAME WEBAPP_NAME=$WEBAPP_NAME \\"
 echo "   ACR_NAME=$ACR_NAME ACR_LOGIN_SERVER=$ACR_NAME.azurecr.io \\"
 echo "   IMAGE_NAME=virtual-library-api IMAGE_TAG=latest \\"
+echo "   COSMOS_ENDPOINT=$COSMOS_ENDPOINT \\"
 echo "   STORAGE_ACCOUNT_NAME=$STORAGE_ACCOUNT_NAME STORAGE_CONTAINER_NAME=user-libraries \\"
 echo "   VISION_ENDPOINT=$VISION_ENDPOINT ./scripts/deploy-webapp.sh"
 echo ""

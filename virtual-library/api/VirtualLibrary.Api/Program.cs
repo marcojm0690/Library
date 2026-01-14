@@ -21,8 +21,44 @@ builder.Services.AddScoped<SearchByImageService>();
 builder.Services.AddScoped<AzureVisionProvider>();
 builder.Services.AddScoped<AzureBlobLibraryRepository>();
 
-// In-memory repository placeholder - replace with actual database implementation
-builder.Services.AddSingleton<IBookRepository, InMemoryBookRepository>();
+// Register Cosmos DB repository
+var cosmosDbConfig = builder.Configuration.GetSection("Azure:CosmosDb");
+var cosmosDbEndpoint = cosmosDbConfig["Endpoint"];
+var databaseName = cosmosDbConfig["DatabaseName"] ?? "LibraryDb";
+var containerName = cosmosDbConfig["ContainerName"] ?? "Books";
+
+if (!string.IsNullOrEmpty(cosmosDbEndpoint))
+{
+    // Use Cosmos DB repository for production
+    builder.Services.AddScoped<CosmosDbBookRepository>(sp =>
+        new CosmosDbBookRepository(
+            cosmosDbEndpoint,
+            databaseName,
+            containerName,
+            sp.GetRequiredService<ILogger<CosmosDbBookRepository>>()));
+
+    builder.Services.AddScoped<IBookRepository>(sp =>
+        sp.GetRequiredService<CosmosDbBookRepository>());
+
+    // Initialize Cosmos DB on startup
+    var cosmosDbInit = builder.Services.BuildServiceProvider();
+    try
+    {
+        var cosmosDbRepo = cosmosDbInit.GetRequiredService<CosmosDbBookRepository>();
+        cosmosDbRepo.InitializeAsync(CancellationToken.None).Wait();
+    }
+    catch (Exception ex)
+    {
+        var logger = cosmosDbInit.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Failed to initialize Cosmos DB on startup. Application will continue with in-memory repository.");
+        builder.Services.AddSingleton<IBookRepository, InMemoryBookRepository>();
+    }
+}
+else
+{
+    // Fallback to in-memory repository if Cosmos DB not configured
+    builder.Services.AddSingleton<IBookRepository, InMemoryBookRepository>();
+}
 
 // Register external book provider services
 builder.Services.AddHttpClient<IBookProvider, OpenLibraryProvider>();

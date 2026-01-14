@@ -14,6 +14,10 @@ set -euo pipefail
 #   IMAGE_TAG=$(git rev-parse HEAD) \
 #   STORAGE_ACCOUNT_NAME=yourstorageaccount \
 #   STORAGE_CONTAINER_NAME=user-libraries \
+#   COSMOS_ACCOUNT_NAME=virtuallibrary-server \
+#   COSMOS_ENDPOINT="https://virtuallibrary-server.documents.azure.com:443/" \
+#   COSMOS_DB_NAME=LibraryDb \
+#   COSMOS_CONTAINER_NAME=Books \
 #   VISION_ENDPOINT="https://YOUR_REGION.api.cognitive.microsoft.com/" \
 #   ./scripts/deploy-webapp.sh
 
@@ -29,6 +33,10 @@ set -euo pipefail
 # Required app settings
 : "${STORAGE_ACCOUNT_NAME:?STORAGE_ACCOUNT_NAME required}"
 : "${STORAGE_CONTAINER_NAME:?STORAGE_CONTAINER_NAME required}"
+: "${COSMOS_ACCOUNT_NAME:?COSMOS_ACCOUNT_NAME required}"
+: "${COSMOS_ENDPOINT:?COSMOS_ENDPOINT required}"
+: "${COSMOS_DB_NAME:?COSMOS_DB_NAME required}"
+: "${COSMOS_CONTAINER_NAME:?COSMOS_CONTAINER_NAME required}"
 : "${VISION_ENDPOINT:?VISION_ENDPOINT required}"
 
 FULL_IMAGE="${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
@@ -65,6 +73,13 @@ if [ -n "$VISION_ID" ]; then
   az role assignment create --assignee "$PRINCIPAL_ID" --role "Cognitive Services User" --scope "$VISION_ID" --only-show-errors || true
 fi
 
+# Grant Cosmos DB Built-in Data Contributor role
+echo "Granting Cosmos DB Built-in Data Contributor role..."
+COSMOS_ID=$(az cosmosdb show -n "$COSMOS_ACCOUNT_NAME" -g "$RG" --query id -o tsv 2>/dev/null || echo "")
+if [ -n "$COSMOS_ID" ]; then
+  az role assignment create --assignee "$PRINCIPAL_ID" --role "Cosmos DB Built-in Data Contributor" --scope "$COSMOS_ID" --only-show-errors || true
+fi
+
 # Configure container to use managed identity for ACR
 az webapp config set -g "$RG" -n "$WEBAPP_NAME" --generic-configurations '{"acrUseManagedIdentityCreds": true}' --only-show-errors
 
@@ -81,6 +96,9 @@ az webapp config appsettings set -g "$RG" -n "$WEBAPP_NAME" --settings \
   ASPNETCORE_ENVIRONMENT=Production \
   Azure__Storage__AccountName="${STORAGE_ACCOUNT_NAME}" \
   Azure__Storage__ContainerName="${STORAGE_CONTAINER_NAME}" \
+  Azure__CosmosDb__Endpoint="${COSMOS_ENDPOINT}" \
+  Azure__CosmosDb__DatabaseName="${COSMOS_DB_NAME}" \
+  Azure__CosmosDb__ContainerName="${COSMOS_CONTAINER_NAME}" \
   Azure__Vision__Endpoint="${VISION_ENDPOINT}" \
   --only-show-errors
 
