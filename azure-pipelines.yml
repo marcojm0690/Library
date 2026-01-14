@@ -9,9 +9,9 @@ resources:
 - repo: self
 
 variables:
-  dockerRegistryServiceConnection: 'YOUR_ACR_SERVICE_CONNECTION_NAME' # Set this in Azure DevOps
+  dockerRegistryServiceConnection: 'virtuallibraryacr' # Set this in Azure DevOps
   imageRepository: 'virtual-library-api'
-  containerRegistry: 'virtuallibraryacr.azurecr.io' # Replace with your ACR name
+  containerRegistry: 'virtuallibraryacr.azurecr.io'
   dockerfilePath: '$(Build.SourcesDirectory)/virtual-library/api/VirtualLibrary.Api/Dockerfile'
   tag: '$(Build.BuildId)'
   vmImageName: 'ubuntu-latest'
