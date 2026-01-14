@@ -21,31 +21,31 @@ builder.Services.AddScoped<SearchByImageService>();
 builder.Services.AddScoped<AzureVisionProvider>();
 builder.Services.AddScoped<AzureBlobLibraryRepository>();
 
-// Register Cosmos DB repository
-var cosmosDbConfig = builder.Configuration.GetSection("Azure:CosmosDb");
-var cosmosDbEndpoint = cosmosDbConfig["Endpoint"];
-var databaseName = cosmosDbConfig["DatabaseName"] ?? "LibraryDb";
-var containerName = cosmosDbConfig["ContainerName"] ?? "Books";
+// Register MongoDB/Cosmos DB repository
+var mongoDbConfig = builder.Configuration.GetSection("Azure:MongoDB");
+var connectionString = mongoDbConfig["ConnectionString"];
+var databaseName = mongoDbConfig["DatabaseName"] ?? "LibraryDb";
+var collectionName = mongoDbConfig["CollectionName"] ?? "Books";
 
-if (!string.IsNullOrEmpty(cosmosDbEndpoint))
+if (!string.IsNullOrEmpty(connectionString))
 {
-    // Use Cosmos DB repository for production
-    builder.Services.AddScoped<CosmosDbBookRepository>(sp =>
-        new CosmosDbBookRepository(
-            cosmosDbEndpoint,
+    // Use MongoDB repository for production
+    builder.Services.AddScoped<MongoDbBookRepository>(sp =>
+        new MongoDbBookRepository(
+            connectionString,
             databaseName,
-            containerName,
-            sp.GetRequiredService<ILogger<CosmosDbBookRepository>>()));
+            collectionName,
+            sp.GetRequiredService<ILogger<MongoDbBookRepository>>()));
 
     builder.Services.AddScoped<IBookRepository>(sp =>
-        sp.GetRequiredService<CosmosDbBookRepository>());
+        sp.GetRequiredService<MongoDbBookRepository>());
 
     // Register seeder for development/testing
-    builder.Services.AddScoped<CosmosDbSeeder>();
+    builder.Services.AddScoped<MongoDbSeeder>();
 }
 else
 {
-    // Fallback to in-memory repository if Cosmos DB not configured
+    // Fallback to in-memory repository if MongoDB not configured
     builder.Services.AddSingleton<IBookRepository, InMemoryBookRepository>();
 }
 
@@ -66,17 +66,27 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Seed Cosmos DB with mock data if configured
-if (!string.IsNullOrEmpty(cosmosDbEndpoint))
+// Seed in-memory repository with mock data in development
+if (app.Environment.IsDevelopment() && string.IsNullOrEmpty(connectionString))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var repo = scope.ServiceProvider.GetRequiredService<IBookRepository>();
+        await InMemorySeeder.SeedMockBooksAsync(repo);
+    }
+}
+
+// Seed MongoDB with mock data if configured
+if (!string.IsNullOrEmpty(connectionString))
 {
     try
     {
-        var seedMockData = cosmosDbConfig.GetValue<bool>("SeedMockData");
+        var seedMockData = mongoDbConfig.GetValue<bool>("SeedMockData");
         if (seedMockData)
         {
             using (var scope = app.Services.CreateScope())
             {
-                var seeder = scope.ServiceProvider.GetRequiredService<CosmosDbSeeder>();
+                var seeder = scope.ServiceProvider.GetRequiredService<MongoDbSeeder>();
                 await seeder.SeedIfEmptyAsync();
             }
         }
@@ -84,7 +94,7 @@ if (!string.IsNullOrEmpty(cosmosDbEndpoint))
     catch (Exception ex)
     {
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
-        logger.LogWarning(ex, "Failed to seed Cosmos DB. Continuing with application startup.");
+        logger.LogWarning(ex, "Failed to seed MongoDB. Continuing with application startup.");
     }
 }
 

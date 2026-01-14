@@ -1,77 +1,24 @@
+using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Domain;
 
 namespace VirtualLibrary.Api.Infrastructure.Persistence;
 
 /// <summary>
-/// Seeds mock book data into Cosmos DB for development and testing.
-/// Safe to run multiple times - uses ISBN as unique identifier to avoid duplicates.
+/// Seeds the in-memory book repository with mock data for development/testing.
+/// Only used when Cosmos DB is not configured.
 /// </summary>
-public class CosmosDbSeeder
+public static class InMemorySeeder
 {
-    private readonly CosmosDbBookRepository _repository;
-    private readonly ILogger<CosmosDbSeeder> _logger;
-
-    public CosmosDbSeeder(CosmosDbBookRepository repository, ILogger<CosmosDbSeeder> logger)
-    {
-        _repository = repository;
-        _logger = logger;
-    }
-
-    /// <summary>
-    /// Seeds mock book data if container is empty.
-    /// Idempotent - safe to call multiple times.
-    /// </summary>
-    public async Task SeedIfEmptyAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _logger.LogInformation("Checking if Cosmos DB needs seeding...");
-
-            var existingBooks = await _repository.GetAllAsync(cancellationToken);
-
-            if (existingBooks.Any())
-            {
-                _logger.LogInformation("Cosmos DB already contains {Count} books. Skipping seed.", existingBooks.Count);
-                return;
-            }
-
-            _logger.LogInformation("Cosmos DB is empty. Seeding mock data...");
-            await SeedMockBooksAsync(cancellationToken);
-            _logger.LogInformation("Seeding completed successfully.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during Cosmos DB seeding");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Seeds all mock book data.
-    /// </summary>
-    private async Task SeedMockBooksAsync(CancellationToken cancellationToken)
+    public static async Task SeedMockBooksAsync(IBookRepository repository)
     {
         var mockBooks = GetMockBooks();
-
+        
         foreach (var book in mockBooks)
         {
-            try
-            {
-                await _repository.SaveAsync(book, cancellationToken);
-                _logger.LogDebug("Seeded book: {Title} by {Authors}", book.Title, string.Join(", ", book.Authors));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error seeding book: {Title}", book.Title);
-                // Continue seeding other books even if one fails
-            }
+            await repository.SaveAsync(book);
         }
     }
 
-    /// <summary>
-    /// Returns sample book data for seeding.
-    /// Includes various genres and authors for testing search functionality.
-    /// </summary>
     private static List<Book> GetMockBooks()
     {
         return new List<Book>

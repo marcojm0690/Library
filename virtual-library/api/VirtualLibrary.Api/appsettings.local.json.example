@@ -1,0 +1,10 @@
+{
+  "Azure": {
+    "MongoDB": {
+      "ConnectionString": "mongodb://virtuallibrary-server:YOUR_KEY_HERE@virtuallibrary-server.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@virtuallibrary-server@",
+      "DatabaseName": "LibraryDb",
+      "CollectionName": "Books",
+      "SeedMockData": true
+    }
+  }
+}
