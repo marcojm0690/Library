@@ -1,5 +1,6 @@
 using Azure;
 using Azure.AI.Vision.ImageAnalysis;
+using Azure.Identity;
 using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Domain;
 
@@ -22,10 +23,9 @@ public class AzureVisionProvider : IBookProvider
         
         var endpoint = configuration["Azure:Vision:Endpoint"]
             ?? throw new InvalidOperationException("Azure Vision endpoint not configured");
-        var apiKey = configuration["Azure:Vision:ApiKey"]
-            ?? throw new InvalidOperationException("Azure Vision API key not configured");
 
-        _client = new ImageAnalysisClient(new Uri(endpoint), new AzureKeyCredential(apiKey));
+        var credential = new DefaultAzureCredential();
+        _client = new ImageAnalysisClient(new Uri(endpoint), credential);
     }
 
     /// <summary>

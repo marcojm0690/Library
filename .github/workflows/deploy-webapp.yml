@@ -36,15 +36,13 @@ jobs:
           LOCATION: ${{ env.LOCATION }}
           PLAN_NAME: ${{ env.PLAN_NAME }}
           WEBAPP_NAME: ${{ env.WEBAPP_NAME }}
+          ACR_NAME: virtuallibraryacr
           ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
-          AZURE_STORAGE_CONTAINER_NAME: user-libraries
-          AZURE_VISION_ENDPOINT: ${{ secrets.AZURE_VISION_ENDPOINT }}
-          AZURE_VISION_APIKEY: ${{ secrets.AZURE_VISION_APIKEY }}
+          STORAGE_ACCOUNT_NAME: ${{ secrets.STORAGE_ACCOUNT_NAME }}
+          STORAGE_CONTAINER_NAME: user-libraries
+          VISION_ENDPOINT: ${{ secrets.AZURE_VISION_ENDPOINT }}
         run: |
           chmod +x ./scripts/deploy-webapp.sh
           ./scripts/deploy-webapp.sh

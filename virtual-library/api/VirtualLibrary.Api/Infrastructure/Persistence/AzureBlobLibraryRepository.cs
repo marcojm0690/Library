@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Identity;
 
 namespace VirtualLibrary.Api.Infrastructure.Persistence;
 
@@ -16,13 +17,15 @@ public class AzureBlobLibraryRepository
     {
         _logger = logger;
         
-        var connectionString = configuration["Azure:Storage:ConnectionString"]
-            ?? throw new InvalidOperationException("Azure Storage connection string not configured");
+        var storageAccountName = configuration["Azure:Storage:AccountName"]
+            ?? throw new InvalidOperationException("Azure Storage account name not configured");
         var containerName = configuration["Azure:Storage:ContainerName"]
             ?? throw new InvalidOperationException("Azure Storage container name not configured");
 
-        var blobClient = new BlobContainerClient(connectionString, containerName);
-        _containerClient = blobClient;
+        var blobServiceUri = new Uri($"https://{storageAccountName}.blob.core.windows.net");
+        var credential = new DefaultAzureCredential();
+        var blobServiceClient = new BlobServiceClient(blobServiceUri, credential);
+        _containerClient = blobServiceClient.GetBlobContainerClient(containerName);
     }
 
     /// <summary>
