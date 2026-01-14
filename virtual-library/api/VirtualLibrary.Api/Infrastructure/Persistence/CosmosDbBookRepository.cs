@@ -10,7 +10,7 @@ namespace VirtualLibrary.Api.Infrastructure.Persistence;
 /// Cosmos DB implementation of IBookRepository for persistent, globally-distributed book storage.
 /// Uses Azure Managed Identity for authentication (no connection strings or keys in code).
 /// </summary>
-public class CosmosDbBookRepository : IBookRepository
+public class CosmosDbBookRepository : IBookRepository, IDisposable
 {
     private readonly CosmosClient _cosmosClient;
     private readonly Container _container;
@@ -115,6 +115,35 @@ public class CosmosDbBookRepository : IBookRepository
     }
 
     /// <summary>
+    /// Get all books in the library
+    /// </summary>
+    public async Task<List<Book>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = "SELECT * FROM c";
+            var queryDefinition = new QueryDefinition(query);
+
+            var iterator = _container.GetItemQueryIterator<Book>(queryDefinition);
+            var results = new List<Book>();
+
+            while (iterator.HasMoreResults)
+            {
+                var page = await iterator.ReadNextAsync(cancellationToken);
+                results.AddRange(page.Resource);
+            }
+
+            _logger.LogDebug("Retrieved all books. Count: {Count}", results.Count);
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all books");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Search for books by title or author text
     /// </summary>
     public async Task<List<Book>> SearchAsync(string query, CancellationToken cancellationToken = default)
@@ -212,12 +241,12 @@ public class CosmosDbBookRepository : IBookRepository
     /// <summary>
     /// Gracefully dispose of Cosmos DB client
     /// </summary>
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
         if (_cosmosClient != null)
         {
             _logger.LogInformation("Disposing Cosmos DB client");
-            await _cosmosClient.DisposeAsync();
+            _cosmosClient.Dispose();
         }
     }
 }
