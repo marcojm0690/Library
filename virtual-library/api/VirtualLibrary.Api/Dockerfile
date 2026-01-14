@@ -2,12 +2,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy everything and restore
-COPY . .
-RUN dotnet restore VirtualLibrary.Api.csproj
+# Copy csproj and restore dependencies
+COPY virtual-library/api/VirtualLibrary.Api/VirtualLibrary.Api.csproj virtual-library/api/VirtualLibrary.Api/
+RUN dotnet restore virtual-library/api/VirtualLibrary.Api/VirtualLibrary.Api.csproj
+
+# Copy the rest of the source code
+COPY virtual-library/api/VirtualLibrary.Api/ virtual-library/api/VirtualLibrary.Api/
 
 # Publish
-RUN dotnet publish VirtualLibrary.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish virtual-library/api/VirtualLibrary.Api/VirtualLibrary.Api.csproj -c Release -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
