@@ -1,0 +1,102 @@
+# Azure Pipelines
+# Build and deploy Virtual Library API to Azure
+# https://learn.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+  - main
+
+resources:
+  - repo: self
+
+variables:
+  dockerRegistryServiceConnection: 'virtuallibraryacr'
+  imageRepository: 'virtual-library-api'
+  containerRegistry: 'virtuallibraryacr.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+  vmImageName: 'ubuntu-latest'
+  resourceGroupName: 'biblioteca'
+  location: 'canadacentral'
+
+stages:
+  - stage: DeployInfrastructure
+    displayName: Deploy Infrastructure
+    jobs:
+      - job: DeployBicep
+        displayName: Deploy Bicep Template
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - checkout: self
+
+          - task: AzureResourceGroupDeployment@2
+            displayName: Deploy Bicep Infrastructure
+            inputs:
+              azureSubscription: $(azureSubscriptionId)
+              action: 'Create Or Update Resource Group'
+              resourceGroupName: $(resourceGroupName)
+              location: $(location)
+              templateLocation: 'Linked artifact'
+              csmFile: '$(Build.SourcesDirectory)/infrastructure/main.bicep'
+              csmParametersFile: '$(Build.SourcesDirectory)/infrastructure/parameters.json'
+              deploymentMode: 'Incremental'
+              deploymentName: 'virtual-library-infra-$(Build.BuildId)'
+
+  - stage: Build
+    displayName: Build and push stage
+    dependsOn: DeployInfrastructure
+    condition: succeeded()
+    jobs:
+      - job: Build
+        displayName: Build
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - checkout: self
+
+          - task: Docker@2
+            displayName: Login to ACR
+            inputs:
+              command: login
+              containerRegistry: $(dockerRegistryServiceConnection)
+
+          - task: Docker@2
+            displayName: Build image
+            inputs:
+              command: build
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(tag)
+                latest
+
+          - task: Docker@2
+            displayName: Push image to ACR
+            inputs:
+              command: push
+              repository: $(imageRepository)
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(tag)
+                latest
+
+  - stage: Deploy
+    displayName: Deploy to Web App
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: Deploy
+        displayName: Deploy
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - checkout: self
+
+          - task: AzureWebApp@1
+            displayName: Deploy to App Service
+            inputs:
+              azureSubscription: $(azureSubscriptionId)
+              appType: webAppContainer
+              appName: 'virtual-library-api-web'
+              containers: $(containerRegistry)/$(imageRepository):$(tag)
