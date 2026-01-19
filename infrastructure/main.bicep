@@ -50,7 +50,7 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
   name: acrName
   location: location
   sku: {
-    name: 'Basic'
+    name: 'Standard'
   }
   properties: {
     adminUserEnabled: false
@@ -171,7 +171,7 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'Azure__MongoDB__ConnectionString'
-          value: listConnectionStrings(cosmosAccount.id, '2023-04-15').connectionStrings[0].connectionString
+          value: cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString
         }
         {
           name: 'Azure__MongoDB__DatabaseName'
@@ -189,7 +189,7 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
       connectionStrings: [
         {
           name: 'CosmosDb'
-          connectionString: listConnectionStrings(cosmosAccount.id, '2023-04-15').connectionStrings[0].connectionString
+          connectionString: cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString
           type: 'Custom'
         }
       ]
