@@ -35,16 +35,13 @@ jobs:
           PLAN_NAME: ${{ env.PLAN_NAME }}
           WEBAPP_NAME: ${{ env.WEBAPP_NAME }}
           ACR_NAME: virtuallibraryacr
-          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_LOGIN_SERVER: virtuallibraryacr.azurecr.io
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          STORAGE_ACCOUNT_NAME: ${{ secrets.STORAGE_ACCOUNT_NAME }}
-          STORAGE_CONTAINER_NAME: user-libraries
-          COSMOS_ACCOUNT_NAME: ${{ secrets.COSMOS_ACCOUNT_NAME }}
-          COSMOS_ENDPOINT: ${{ secrets.COSMOS_ENDPOINT }}
-          COSMOS_DB_NAME: ${{ secrets.COSMOS_DB_NAME }}
-          COSMOS_CONTAINER_NAME: ${{ secrets.COSMOS_CONTAINER_NAME }}
-          VISION_ENDPOINT: ${{ secrets.AZURE_VISION_ENDPOINT }}
+          COSMOS_ACCOUNT_NAME: virtual-library-server
+          COSMOS_ENDPOINT: https://virtual-library-server.documents.azure.com:443/
+          COSMOS_DB_NAME: LibraryDb
+          COSMOS_CONTAINER_NAME: Books
         run: |
           chmod +x ./scripts/deploy-webapp.sh
           ./scripts/deploy-webapp.sh
