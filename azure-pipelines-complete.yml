@@ -9,6 +9,8 @@ resources:
   - repo: self
 
 variables:
+  # Azure service connection name - CREATE THIS in Azure DevOps > Project Settings > Service Connections
+  azureServiceConnection: 'azure-service-connection'  # CHANGE THIS to your service connection name
   dockerRegistryServiceConnection: 'virtuallibraryacr'
   imageRepository: 'virtual-library-api'
   containerRegistry: 'virtuallibraryacr.azurecr.io'
@@ -32,7 +34,7 @@ stages:
           - task: AzureResourceGroupDeployment@2
             displayName: Deploy Bicep Infrastructure
             inputs:
-              azureSubscription: $(azureSubscriptionId)
+              azureSubscription: $(azureServiceConnection)
               action: 'Create Or Update Resource Group'
               resourceGroupName: $(resourceGroupName)
               location: $(location)
@@ -96,7 +98,7 @@ stages:
           - task: AzureCLI@2
             displayName: Get Web App Name
             inputs:
-              azureSubscription: $(azureSubscriptionId)
+              azureSubscription: $(azureServiceConnection)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
@@ -108,7 +110,7 @@ stages:
           - task: AzureWebAppContainer@1
             displayName: Deploy to App Service
             inputs:
-              azureSubscription: $(azureSubscriptionId)
+              azureSubscription: $(azureServiceConnection)
               appName: $(webAppName)
               containers: $(containerRegistry)/$(imageRepository):$(tag)
               startUpCommand: ''
