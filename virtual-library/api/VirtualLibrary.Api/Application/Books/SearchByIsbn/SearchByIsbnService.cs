@@ -37,13 +37,13 @@ public class SearchByIsbnService
         }
 
         // Clean ISBN (remove dashes, spaces)
-        var cleanIsbn = isbn.Replace("-", "").Replace(" ", "").Trim();
+        // var cleanIsbn = isbn.Replace("-", "").Replace(" ", "").Trim();
 
         // First, check if book exists in local repository
-        var existingBook = await _bookRepository.GetByIsbnAsync(cleanIsbn, cancellationToken);
+        var existingBook = await _bookRepository.GetByIsbnAsync(isbn, cancellationToken);
         if (existingBook != null)
         {
-            _logger.LogInformation("Book found in local repository: {Isbn}", cleanIsbn);
+            _logger.LogInformation("Book found in local repository: {Isbn}", isbn);
             return MapToResponse(existingBook);
         }
 
@@ -52,13 +52,13 @@ public class SearchByIsbnService
         {
             try
             {
-                _logger.LogInformation("Searching {Provider} for ISBN: {Isbn}", provider.ProviderName, cleanIsbn);
-                var book = await provider.SearchByIsbnAsync(cleanIsbn, cancellationToken);
-                
+                _logger.LogInformation("Searching {Provider} for ISBN: {Isbn}", provider.ProviderName, isbn);
+                var book = await provider.SearchByIsbnAsync(isbn, cancellationToken);
+
                 if (book != null)
                 {
                     _logger.LogInformation("Book found via {Provider}: {Title}", provider.ProviderName, book.Title);
-                    
+
                     // Save to repository for future lookups
                     var savedBook = await _bookRepository.SaveAsync(book, cancellationToken);
                     return MapToResponse(savedBook);
@@ -66,12 +66,12 @@ public class SearchByIsbnService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error searching {Provider} for ISBN: {Isbn}", provider.ProviderName, cleanIsbn);
+                _logger.LogError(ex, "Error searching {Provider} for ISBN: {Isbn}", provider.ProviderName, isbn);
                 // Continue to next provider
             }
         }
 
-        _logger.LogWarning("Book not found for ISBN: {Isbn}", cleanIsbn);
+        _logger.LogWarning("Book not found for ISBN: {Isbn}", isbn);
         return null;
     }
 

@@ -63,14 +63,30 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
             // Clean the ISBN for comparison (remove dashes and spaces)
             var cleanIsbn = isbn.Replace("-", "").Replace(" ", "").Trim();
             
-            // Search for ISBN with or without dashes
-            var filter = Builders<MongoBook>.Filter.Or(
-                Builders<MongoBook>.Filter.Eq(b => b.Isbn, isbn),
-                Builders<MongoBook>.Filter.Eq(b => b.Isbn, cleanIsbn),
-                Builders<MongoBook>.Filter.Regex(b => b.Isbn, new MongoDB.Bson.BsonRegularExpression($"^{cleanIsbn.Replace("-", "[-]?")}$", "i"))
+            // Try exact match first (fast)
+            var exactFilter = Builders<MongoBook>.Filter.Eq(b => b.Isbn, isbn);
+            var mongoBook = await _collection.Find(exactFilter).FirstOrDefaultAsync(cancellationToken);
+            
+            if (mongoBook != null)
+            {
+                return mongoBook.ToBook();
+            }
+            
+            // If not found, try searching with cleaned ISBN
+            var cleanFilter = Builders<MongoBook>.Filter.Eq(b => b.Isbn, cleanIsbn);
+            mongoBook = await _collection.Find(cleanFilter).FirstOrDefaultAsync(cancellationToken);
+            
+            if (mongoBook != null)
+            {
+                return mongoBook.ToBook();
+            }
+            
+            // Last resort: fetch all and compare normalized ISBNs
+            var allBooks = await _collection.Find(_ => true).ToListAsync(cancellationToken);
+            mongoBook = allBooks.FirstOrDefault(b => 
+                b.Isbn?.Replace("-", "").Replace(" ", "").Equals(cleanIsbn, StringComparison.OrdinalIgnoreCase) == true
             );
             
-            var mongoBook = await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
             return mongoBook?.ToBook();
         }
         catch (Exception ex)
