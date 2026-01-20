@@ -3,6 +3,7 @@ using VirtualLibrary.Api.Application.Books.SearchByIsbn;
 using VirtualLibrary.Api.Application.Books.SearchByCover;
 using VirtualLibrary.Api.Application.Books.SearchByImage;
 using VirtualLibrary.Api.Application.DTOs;
+using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Infrastructure.External;
 using VirtualLibrary.Api.Infrastructure.Persistence;
 
@@ -20,6 +21,7 @@ public class BooksController : ControllerBase
     private readonly SearchByCoverService _searchByCoverService;
     private readonly SearchByImageService _searchByImageService;
     private readonly AzureBlobLibraryRepository _libraryRepository;
+    private readonly IBookRepository _bookRepository;
     private readonly ILogger<BooksController> _logger;
 
     public BooksController(
@@ -27,12 +29,14 @@ public class BooksController : ControllerBase
         SearchByCoverService searchByCoverService,
         SearchByImageService searchByImageService,
         AzureBlobLibraryRepository libraryRepository,
+        IBookRepository bookRepository,
         ILogger<BooksController> logger)
     {
         _searchByIsbnService = searchByIsbnService;
         _searchByCoverService = searchByCoverService;
         _searchByImageService = searchByImageService;
         _libraryRepository = libraryRepository;
+        _bookRepository = bookRepository;
         _logger = logger;
     }
 
@@ -62,6 +66,44 @@ public class BooksController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Get all books in the repository.
+    /// </summary>
+    /// <returns>List of all books</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<BookResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetAllBooks()
+    {
+        try
+        {
+            _logger.LogInformation("Retrieving all books");
+
+            var books = await _bookRepository.GetAllAsync();
+
+            var response = books.Select(book => new BookResponse
+            {
+                Id = book.Id,
+                Title = book.Title,
+                Authors = book.Authors,
+                Description = book.Description,
+                Isbn = book.Isbn,
+                Publisher = book.Publisher,
+                PublishYear = book.PublishedDate?.Year,
+                PageCount = book.PageCount,
+                CoverImageUrl = book.CoverImageUrl,
+                Source = "Repository"
+            }).ToList();
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all books");
+            return StatusCode(500, new { error = "Error retrieving books", details = ex.Message });
+        }
     }
 
     /// <summary>
