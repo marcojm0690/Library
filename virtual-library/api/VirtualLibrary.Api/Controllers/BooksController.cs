@@ -91,7 +91,7 @@ public class BooksController : ControllerBase
                 Description = book.Description,
                 Isbn = book.Isbn,
                 Publisher = book.Publisher,
-                PublishYear = book.PublishedDate?.Year,
+                PublishYear = book.PublishYear,
                 PageCount = book.PageCount,
                 CoverImageUrl = book.CoverImageUrl,
                 Source = "Repository"
