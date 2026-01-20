@@ -69,6 +69,51 @@ public class BooksController : ControllerBase
     }
 
     /// <summary>
+    /// Get a book by its internal ID.
+    /// </summary>
+    /// <param name="id">The book's unique identifier</param>
+    /// <returns>Book information if found, 404 if not found</returns>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(BookResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        try
+        {
+            _logger.LogInformation("Get book request for ID: {BookId}", id);
+
+            var book = await _bookRepository.GetByIdAsync(id);
+
+            if (book == null)
+            {
+                return NotFound(new { error = "Book not found", id });
+            }
+
+            var response = new BookResponse
+            {
+                Id = book.Id,
+                Title = book.Title,
+                Authors = book.Authors,
+                Description = book.Description,
+                Isbn = book.Isbn,
+                Publisher = book.Publisher,
+                PublishYear = book.PublishYear,
+                PageCount = book.PageCount,
+                CoverImageUrl = book.CoverImageUrl,
+                Source = "Repository"
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving book by ID: {BookId}", id);
+            return StatusCode(500, new { error = "Error retrieving book", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get all books in the repository.
     /// </summary>
     /// <returns>List of all books</returns>
