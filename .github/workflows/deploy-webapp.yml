@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: virtual-library-api
-      RESOURCE_GROUP: VirtualLibraryRG
+      RESOURCE_GROUP: biblioteca
       LOCATION: canadacentral
       PLAN_NAME: vl-asp-linux
       WEBAPP_NAME: virtual-library-api-web
