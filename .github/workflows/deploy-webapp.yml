@@ -15,7 +15,7 @@ jobs:
     env:
       IMAGE_NAME: virtual-library-api
       RESOURCE_GROUP: VirtualLibraryRG
-      LOCATION: eastus
+      LOCATION: canadacentral
       PLAN_NAME: vl-asp-linux
       WEBAPP_NAME: virtual-library-api-web
       IMAGE_TAG: ${{ github.event.inputs.imageTag || github.sha }}
