@@ -60,7 +60,16 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
     {
         try
         {
-            var filter = Builders<MongoBook>.Filter.Eq(b => b.Isbn, isbn);
+            // Clean the ISBN for comparison (remove dashes and spaces)
+            var cleanIsbn = isbn.Replace("-", "").Replace(" ", "").Trim();
+            
+            // Search for ISBN with or without dashes
+            var filter = Builders<MongoBook>.Filter.Or(
+                Builders<MongoBook>.Filter.Eq(b => b.Isbn, isbn),
+                Builders<MongoBook>.Filter.Eq(b => b.Isbn, cleanIsbn),
+                Builders<MongoBook>.Filter.Regex(b => b.Isbn, new MongoDB.Bson.BsonRegularExpression($"^{cleanIsbn.Replace("-", "[-]?")}$", "i"))
+            );
+            
             var mongoBook = await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
             return mongoBook?.ToBook();
         }
