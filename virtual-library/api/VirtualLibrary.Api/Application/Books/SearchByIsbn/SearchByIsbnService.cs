@@ -36,8 +36,6 @@ public class SearchByIsbnService
             return null;
         }
 
-        // Clean ISBN (remove dashes, spaces)
-        // var cleanIsbn = isbn.Replace("-", "").Replace(" ", "").Trim();
 
         // First, check if book exists in local repository
         var existingBook = await _bookRepository.GetByIsbnAsync(isbn, cancellationToken);
