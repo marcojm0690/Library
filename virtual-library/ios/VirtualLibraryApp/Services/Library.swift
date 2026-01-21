@@ -1,33 +1,45 @@
 import Foundation
 
-/// Domain model representing a user library in the Virtual Library.
-struct Library: Identifiable, Codable {
+/// Library model matching the API structure
+struct Library: Identifiable, Codable, Equatable {
     let id: UUID
     let name: String
-    let owner: String
     let description: String?
+    let owner: String
     let createdAt: Date
-    let updatedAt: Date?
+    let updatedAt: Date
+    let bookIds: [UUID]
+    let bookCount: Int
+    let tags: [String]
+    let isPublic: Bool
     
-    // Optional derived info often returned by APIs; make it optional to be resilient.
-    let bookCount: Int?
-    
-    // Coding keys if your backend uses different casing; adjust as needed.
-    // If your API already uses these names, you can remove CodingKeys entirely.
     enum CodingKeys: String, CodingKey {
         case id
         case name
-        case owner
         case description
+        case owner
         case createdAt
         case updatedAt
+        case bookIds
         case bookCount
+        case tags
+        case isPublic
     }
 }
 
-/// Request payload to create a new library.
+/// Request model for creating a library
 struct CreateLibraryRequest: Codable {
     let name: String
-    let owner: String
     let description: String?
+    let owner: String
+    let tags: [String]?
+    let isPublic: Bool
+}
+
+/// Request model for updating a library
+struct UpdateLibraryRequest: Codable {
+    let name: String?
+    let description: String?
+    let tags: [String]?
+    let isPublic: Bool?
 }

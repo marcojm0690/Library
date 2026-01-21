@@ -4,9 +4,17 @@ import SwiftUI
 /// Uses SwiftUI App lifecycle (iOS 14+)
 @main
 struct VirtualLibraryApp: App {
+    @StateObject private var authService = AuthenticationService()
+    
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            if authService.isAuthenticated {
+                HomeView()
+                    .environmentObject(authService)
+            } else {
+                LoginView()
+                    .environmentObject(authService)
+            }
         }
     }
 }

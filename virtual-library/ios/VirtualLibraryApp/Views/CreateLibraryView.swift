@@ -2,17 +2,20 @@ import SwiftUI
 
 /// View for creating a new library
 struct CreateLibraryView: View {
-    @StateObject private var viewModel = CreateLibraryViewModel()
+    @EnvironmentObject var authService: AuthenticationService
+    @StateObject private var viewModel: CreateLibraryViewModel
     @Environment(\.dismiss) private var dismiss
+    
+    init() {
+        // Will be initialized properly in body with environmentObject
+        _viewModel = StateObject(wrappedValue: CreateLibraryViewModel(userId: ""))
+    }
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Library Information")) {
                     TextField("Library Name *", text: $viewModel.name)
-                        .autocapitalization(.words)
-                    
-                    TextField("Owner *", text: $viewModel.owner)
                         .autocapitalization(.words)
                     
                     TextEditor(text: $viewModel.description)
@@ -81,7 +84,7 @@ struct CreateLibraryView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Create") {
                         Task {
-                            await viewModel.createLibrary()
+                            await createLibraryWithUser()
                         }
                     }
                     .disabled(!viewModel.isValid || viewModel.isCreating)
@@ -101,6 +104,25 @@ struct CreateLibraryView: View {
                         .shadow(radius: 10)
                 }
             }
+        }
+    }
+    
+    private func createLibraryWithUser() async {
+        guard let userId = authService.user?.id else { return }
+        
+        // Create new view model with user ID
+        let vm = CreateLibraryViewModel(userId: userId)
+        vm.name = viewModel.name
+        vm.description = viewModel.description
+        vm.tags = viewModel.tags
+        vm.isPublic = viewModel.isPublic
+        
+        await vm.createLibrary()
+        
+        if vm.createdLibrary != nil {
+            dismiss()
+        } else if let error = vm.error {
+            viewModel.error = error
         }
     }
 }

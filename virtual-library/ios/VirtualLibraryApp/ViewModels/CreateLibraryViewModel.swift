@@ -5,7 +5,6 @@ import Foundation
 class CreateLibraryViewModel: ObservableObject {
     @Published var name = ""
     @Published var description = ""
-    @Published var owner = ""
     @Published var tags: [String] = []
     @Published var isPublic = false
     @Published var currentTag = ""
@@ -15,15 +14,16 @@ class CreateLibraryViewModel: ObservableObject {
     @Published var createdLibrary: Library?
     
     private let apiService: BookApiService
+    private let userId: String
     
-    init(apiService: BookApiService = BookApiService()) {
+    init(userId: String, apiService: BookApiService = BookApiService()) {
+        self.userId = userId
         self.apiService = apiService
     }
     
     /// Validate form inputs
     var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !owner.trimmingCharacters(in: .whitespaces).isEmpty
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
     }
     
     /// Add a tag to the list
@@ -54,7 +54,7 @@ class CreateLibraryViewModel: ObservableObject {
             let request = CreateLibraryRequest(
                 name: name.trimmingCharacters(in: .whitespaces),
                 description: description.isEmpty ? nil : description.trimmingCharacters(in: .whitespaces),
-                owner: owner.trimmingCharacters(in: .whitespaces),
+                owner: userId,
                 tags: tags.isEmpty ? nil : tags,
                 isPublic: isPublic
             )
@@ -73,7 +73,6 @@ class CreateLibraryViewModel: ObservableObject {
     func reset() {
         name = ""
         description = ""
-        owner = ""
         tags = []
         isPublic = false
         currentTag = ""

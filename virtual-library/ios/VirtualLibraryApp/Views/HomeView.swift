@@ -3,6 +3,7 @@ import SwiftUI
 /// Main home screen of the Virtual Library app.
 /// Provides navigation to ISBN scanning and cover scanning features.
 struct HomeView: View {
+    @EnvironmentObject var authService: AuthenticationService
     @State private var showCreateLibrary = false
     
     var body: some View {
@@ -14,11 +15,23 @@ struct HomeView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.blue)
                     
-                    Text("Biblioteca Virtual")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                    // Welcome message with user name
+                    if let userName = authService.user?.fullName {
+                        Text("¡Bienvenido!")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text(userName)
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                    } else {
+                        Text("Biblioteca Virtual")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                    }
                     
-                    Text("Identifica y agrega libros a su biblioteca")
+                    Text("Identifica y agrega libros a tu biblioteca")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -54,11 +67,11 @@ struct HomeView: View {
                         )
                     }
                     
-                    NavigationLink(destination: ScanCoverView()) {
+                    NavigationLink(destination: LibrariesListView()) {
                         FeatureButton(
                             icon: "books.vertical.fill",
-                            title: "Ver biblioteca",
-                            description: "Explora tus libros guardados"
+                            title: "Ver bibliotecas",
+                            description: "Explora tus bibliotecas guardadas"
                         )
                     }
                 }
@@ -67,8 +80,18 @@ struct HomeView: View {
                 Spacer()
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        authService.signOut()
+                    }) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                    }
+                }
+            }
             .sheet(isPresented: $showCreateLibrary) {
                 CreateLibraryView()
+                    .environmentObject(authService)
             }
         }
     }
