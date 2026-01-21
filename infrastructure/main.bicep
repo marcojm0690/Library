@@ -1,7 +1,8 @@
 param location string = resourceGroup().location
 param environment string = 'prod'
 
-@minLength(5)
+@minLength(3)
+@maxLength(20)
 @description('Application name used for resource naming')
 param appName string = 'virtual-library'
 
