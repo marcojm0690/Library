@@ -10,11 +10,9 @@ class ScanIsbnViewModel: ObservableObject {
     @Published var isLoading = false
     
     private let apiService: BookApiService
-    private let cameraService: CameraService
     
-    init(apiService: BookApiService = BookApiService(), cameraService: CameraService = CameraService()) {
+    init(apiService: BookApiService = BookApiService()) {
         self.apiService = apiService
-        self.cameraService = cameraService
     }
     
     /// Start scanning for ISBN barcode
@@ -26,7 +24,6 @@ class ScanIsbnViewModel: ObservableObject {
     /// Stop scanning
     func stopScanning() {
         isScanning = false
-        cameraService.stopScanning()
     }
     
     /// Look up book by ISBN
@@ -34,6 +31,7 @@ class ScanIsbnViewModel: ObservableObject {
     func lookupBook(isbn: String) async {
         isLoading = true
         error = nil
+        stopScanning() // Stop camera when looking up
         
         do {
             let book = try await apiService.lookupByIsbn(isbn)
@@ -55,6 +53,6 @@ class ScanIsbnViewModel: ObservableObject {
         scannedBook = nil
         error = nil
         isLoading = false
-        stopScanning()
+        isScanning = false
     }
 }

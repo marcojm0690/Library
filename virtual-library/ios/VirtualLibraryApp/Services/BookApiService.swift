@@ -126,6 +126,64 @@ class BookApiService: ObservableObject {
             throw APIError.networkError(error)
         }
     }
+    
+    // MARK: - Library Management
+    
+    /// Get all libraries
+    func getAllLibraries() async throws -> [Library] {
+        let url = URL(string: "\(baseURL)/api/libraries")!
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([Library].self, from: data)
+    }
+    
+    /// Create a new library
+    func createLibrary(_ request: CreateLibraryRequest) async throws -> Library {
+        let url = URL(string: "\(baseURL)/api/libraries")!
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let encoder = JSONEncoder()
+        urlRequest.httpBody = try encoder.encode(request)
+        
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(Library.self, from: data)
+    }
+    
+    /// Get libraries by owner
+    func getLibrariesByOwner(_ owner: String) async throws -> [Library] {
+        let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner
+        let url = URL(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)")!
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([Library].self, from: data)
+    }
 }
 
 // MARK: - API Errors

@@ -27,6 +27,7 @@ struct ScanIsbnView: View {
                     Spacer()
                     
                     Button("Cancel") {
+                        cameraService.stopScanning()
                         viewModel.stopScanning()
                     }
                     .padding()
@@ -102,6 +103,14 @@ struct ScanIsbnView: View {
                 }
             }
         }
+        .onAppear {
+            print("📱 ISBN Scanner view appeared")
+        }
+        .onDisappear {
+            print("🚪 ISBN Scanner view disappeared - cleaning up camera")
+            cameraService.stopScanning()
+            viewModel.reset()
+        }
     }
 }
 
@@ -109,25 +118,64 @@ struct ScanIsbnView: View {
 struct CameraPreviewView: UIViewRepresentable {
     let cameraService: CameraService
     
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
-        view.backgroundColor = .black
+    func makeUIView(context: Context) -> CameraPreviewUIView {
+        let view = CameraPreviewUIView()
         
+        // Start camera scanning only once
         cameraService.startScanning { previewLayer in
-            guard let previewLayer = previewLayer else { return }
+            guard let previewLayer = previewLayer else {
+                print("❌ Failed to get preview layer")
+                return
+            }
+            
             DispatchQueue.main.async {
-                previewLayer.frame = view.bounds
-                view.layer.addSublayer(previewLayer)
+                view.setupPreviewLayer(previewLayer)
             }
         }
         
         return view
     }
     
-    func updateUIView(_ uiView: UIView, context: Context) {
-        // Update preview layer frame if needed
-        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            previewLayer.frame = uiView.bounds
+    func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {
+        // Frame updates are handled by the view itself in layoutSubviews
+    }
+}
+
+/// Custom UIView for camera preview that properly handles layout
+class CameraPreviewUIView: UIView {
+    private var previewLayer: AVCaptureVideoPreviewLayer?
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .black
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func setupPreviewLayer(_ layer: AVCaptureVideoPreviewLayer) {
+        // Remove any existing preview layers
+        self.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        
+        previewLayer = layer
+        layer.frame = bounds
+        layer.videoGravity = .resizeAspectFill
+        self.layer.insertSublayer(layer, at: 0)
+        
+        print("✅ Camera preview layer setup with frame: \(bounds)")
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        // Update preview layer frame whenever view bounds change
+        if let previewLayer = previewLayer {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            previewLayer.frame = bounds
+            CATransaction.commit()
+            print("📐 Preview layer frame updated to: \(bounds)")
         }
     }
 }

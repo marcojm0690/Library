@@ -26,6 +26,7 @@ var mongoDbConfig = builder.Configuration.GetSection("Azure:MongoDB");
 var connectionString = mongoDbConfig["ConnectionString"];
 var databaseName = mongoDbConfig["DatabaseName"] ?? "LibraryDb";
 var collectionName = mongoDbConfig["CollectionName"] ?? "Books";
+var librariesCollectionName = mongoDbConfig["LibrariesCollectionName"] ?? "Libraries";
 
 if (!string.IsNullOrEmpty(connectionString))
 {
@@ -39,6 +40,17 @@ if (!string.IsNullOrEmpty(connectionString))
 
     builder.Services.AddScoped<IBookRepository>(sp =>
         sp.GetRequiredService<MongoDbBookRepository>());
+
+    // Register library repository
+    builder.Services.AddScoped<MongoDbLibraryRepository>(sp =>
+        new MongoDbLibraryRepository(
+            connectionString,
+            databaseName,
+            librariesCollectionName,
+            sp.GetRequiredService<ILogger<MongoDbLibraryRepository>>()));
+
+    builder.Services.AddScoped<ILibraryRepository>(sp =>
+        sp.GetRequiredService<MongoDbLibraryRepository>());
 
     // Register seeder for development/testing
     builder.Services.AddScoped<MongoDbSeeder>();

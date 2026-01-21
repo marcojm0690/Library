@@ -3,6 +3,8 @@ import SwiftUI
 /// Main home screen of the Virtual Library app.
 /// Provides navigation to ISBN scanning and cover scanning features.
 struct HomeView: View {
+    @State private var showCreateLibrary = false
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 30) {
@@ -41,13 +43,17 @@ struct HomeView: View {
                             description: "Use OCR to identify from cover"
                         )
                     }
-                    NavigationLink(destination: ScanCoverView()) {
+                    
+                    Button(action: {
+                        showCreateLibrary = true
+                    }) {
                         FeatureButton(
                             icon: "plus.rectangle.on.folder.fill",
                             title: "Crear biblioteca",
                             description: "Crea una nueva biblioteca personal"
                         )
                     }
+                    
                     NavigationLink(destination: ScanCoverView()) {
                         FeatureButton(
                             icon: "books.vertical.fill",
@@ -61,6 +67,9 @@ struct HomeView: View {
                 Spacer()
             }
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showCreateLibrary) {
+                CreateLibraryView()
+            }
         }
     }
 }
