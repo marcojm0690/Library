@@ -29,7 +29,7 @@ class OCRService: ObservableObject {
         do {
             try handler.perform([request])
             
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
+            guard let observations = request.results, !observations.isEmpty else {
                 await MainActor.run {
                     self.error = "No text found"
                 }

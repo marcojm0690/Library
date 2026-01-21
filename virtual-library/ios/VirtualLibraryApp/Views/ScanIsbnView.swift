@@ -95,7 +95,7 @@ struct ScanIsbnView: View {
         }
         .navigationTitle("ISBN Scanner")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: cameraService.scannedISBN) { newValue in
+        .onChange(of: cameraService.scannedISBN) { oldValue, newValue in
             if let isbn = newValue {
                 Task {
                     await viewModel.lookupBook(isbn: isbn)

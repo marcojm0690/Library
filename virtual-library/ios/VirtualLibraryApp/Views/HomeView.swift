@@ -36,23 +36,23 @@ struct HomeView: View {
                     
                     NavigationLink(destination: ScanCoverView()) {
                         FeatureButton(
-                            icon: "doc.text.viewfinder",
+                            icon: "book.closed.fill",
                             title: "Escanear cubierta",
                             description: "Use OCR to identify from cover"
                         )
                     }
                     NavigationLink(destination: ScanCoverView()) {
                         FeatureButton(
-                            icon: "doc.text.viewfinder",
+                            icon: "plus.rectangle.on.folder.fill",
                             title: "Crear biblioteca",
-                            description: "Use OCR to identify from cover"
+                            description: "Crea una nueva biblioteca personal"
                         )
                     }
                     NavigationLink(destination: ScanCoverView()) {
                         FeatureButton(
-                            icon: "doc.text.viewfinder",
+                            icon: "books.vertical.fill",
                             title: "Ver biblioteca",
-                            description: "Use OCR to identify from cover"
+                            description: "Explora tus libros guardados"
                         )
                     }
                 }
