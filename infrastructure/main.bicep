@@ -14,6 +14,7 @@ var webAppName = '${appName}-api-web'
 var vnetName = '${appName}-vnet'
 var cosmosDbName = 'LibraryDb'
 var cosmosDbCollection = 'Books'
+var redisName = '${appName}-redis-${environment}'
 
 // Create Virtual Network for private endpoints
 resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
@@ -132,6 +133,25 @@ resource cosmosCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabase
   }
 }
 
+// Create Azure Cache for Redis
+resource redis 'Microsoft.Cache/redis@2023-08-01' = {
+  name: redisName
+  location: location
+  properties: {
+    sku: {
+      name: 'Basic'
+      family: 'C'
+      capacity: 0
+    }
+    enableNonSslPort: false
+    minimumTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
+    redisConfiguration: {
+      'maxmemory-policy': 'allkeys-lru'
+    }
+  }
+}
+
 // Create App Service Plan
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   name: appServicePlanName
@@ -189,6 +209,14 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'Azure__CosmosDb__Endpoint'
           value: cosmosAccount.properties.documentEndpoint
         }
+        {
+          name: 'Azure__Redis__ConnectionString'
+          value: '${redis.properties.hostName}:6380,password=${redis.listKeys().primaryKey},ssl=True,abortConnect=False'
+        }
+        {
+          name: 'Azure__Redis__CacheExpirationMinutes'
+          value: '1440'
+        }
       ]
       connectionStrings: [
         {
@@ -226,3 +254,5 @@ output webAppUrl string = 'https://${webApp.properties.defaultHostName}'
 output cosmosDbEndpoint string = cosmosAccount.properties.documentEndpoint
 output webAppName string = webApp.name
 output webAppPrincipalId string = webApp.identity.principalId
+output redisHostName string = redis.properties.hostName
+output redisName string = redis.name

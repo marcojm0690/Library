@@ -1,6 +1,9 @@
 using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Application.DTOs;
 using VirtualLibrary.Api.Domain;
+using VirtualLibrary.Api.Infrastructure.Cache;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace VirtualLibrary.Api.Application.Books.SearchByCover;
 
@@ -12,15 +15,18 @@ public class SearchByCoverService
 {
     private readonly IEnumerable<IBookProvider> _bookProviders;
     private readonly IBookRepository _bookRepository;
+    private readonly RedisCacheService _cache;
     private readonly ILogger<SearchByCoverService> _logger;
 
     public SearchByCoverService(
         IEnumerable<IBookProvider> bookProviders,
         IBookRepository bookRepository,
+        RedisCacheService cache,
         ILogger<SearchByCoverService> logger)
     {
         _bookProviders = bookProviders;
         _bookRepository = bookRepository;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -39,6 +45,18 @@ public class SearchByCoverService
         // Clean and normalize the extracted text
         var searchText = CleanExtractedText(extractedText);
         _logger.LogInformation("Searching for book with cover text: {Text}", searchText);
+
+        // Check cache first
+        var cacheKey = GenerateCacheKey(searchText);
+        var cachedResponse = await _cache.GetAsync<SearchBooksResponse>(cacheKey, cancellationToken);
+        
+        if (cachedResponse != null)
+        {
+            _logger.LogInformation("Cache hit! Returning {Count} cached results", cachedResponse.TotalResults);
+            return cachedResponse;
+        }
+
+        _logger.LogInformation("Cache miss, searching providers...");
 
         var allResults = new List<Book>();
 
@@ -75,6 +93,14 @@ public class SearchByCoverService
         };
 
         _logger.LogInformation("Returning {Count} unique results", response.TotalResults);
+        
+        // Cache the response (only if we have results)
+        if (response.TotalResults > 0)
+        {
+            await _cache.SetAsync(cacheKey, response, cancellationToken);
+            _logger.LogInformation("Cached search results for key: {Key}", cacheKey);
+        }
+
         return response;
     }
 
@@ -140,6 +166,17 @@ public class SearchByCoverService
         }
         
         return cleanText;
+    }
+
+    /// <summary>
+    /// Generate a cache key from search text using SHA256 hash
+    /// </summary>
+    private string GenerateCacheKey(string searchText)
+    {
+        var normalizedText = searchText.ToLowerInvariant().Trim();
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(normalizedText));
+        var hashString = Convert.ToHexString(hash).ToLower();
+        return $"search:{hashString}";
     }
 
     /// <summary>

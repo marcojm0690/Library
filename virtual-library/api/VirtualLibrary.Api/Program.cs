@@ -4,6 +4,7 @@ using VirtualLibrary.Api.Application.Books.SearchByCover;
 using VirtualLibrary.Api.Application.Books.SearchByImage;
 using VirtualLibrary.Api.Infrastructure.External;
 using VirtualLibrary.Api.Infrastructure.Persistence;
+using VirtualLibrary.Api.Infrastructure.Cache;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Register Redis cache service
+builder.Services.AddSingleton<RedisCacheService>();
 
 // Register application services
 builder.Services.AddScoped<SearchByIsbnService>();
