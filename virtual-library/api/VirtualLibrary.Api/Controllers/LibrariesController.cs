@@ -64,7 +64,21 @@ public class LibrariesController : ControllerBase
         {
             return NotFound(new { message = $"Library with ID {id} not found" });
         }
-cacheKey = $"libraries:owner:{owner}";
+
+        // Cache for 5 minutes
+        await _cache.SetAsync(cacheKey, library, TimeSpan.FromMinutes(5));
+        
+        return Ok(MapToResponse(library));
+    }
+
+    /// <summary>
+    /// Get libraries by owner
+    /// </summary>
+    [HttpGet("owner/{owner}")]
+    [ProducesResponseType(typeof(IEnumerable<LibraryResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<LibraryResponse>>> GetByOwner(string owner)
+    {
+        var cacheKey = $"libraries:owner:{owner}";
         
         // Check cache first
         var cachedLibraries = await _cache.GetAsync<List<Library>>(cacheKey);
@@ -82,21 +96,7 @@ cacheKey = $"libraries:owner:{owner}";
         // Cache for 3 minutes (shorter since this might change more frequently)
         await _cache.SetAsync(cacheKey, libraryList, TimeSpan.FromMinutes(3));
         
-        var responses = libraryList5 minutes
-        await _cache.SetAsync(cacheKey, library, TimeSpan.FromMinutes(5));
-        
-        return Ok(MapToResponse(library));
-    }
-
-    /// <summary>
-    /// Get libraries by owner
-    /// </summary>
-    [HttpGet("owner/{owner}")]
-    [ProducesResponseType(typeof(IEnumerable<LibraryResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<LibraryResponse>>> GetByOwner(string owner)
-    {
-        var libraries = await _libraryRepository.GetByOwnerAsync(owner);
-        var responses = libraries.Select(MapToResponse);
+        var responses = libraryList.Select(MapToResponse);
         return Ok(responses);
     }
 
@@ -144,9 +144,6 @@ cacheKey = $"libraries:owner:{owner}";
         var existing = await _libraryRepository.GetByIdAsync(id);
         
         if (existing == null)
-        // Invalidate caches
-        await InvalidateLibraryCache(id, updated.Owner);
-        
         {
             return NotFound(new { message = $"Library with ID {id} not found" });
         }
@@ -164,6 +161,9 @@ cacheKey = $"libraries:owner:{owner}";
             return NotFound(new { message = $"Library with ID {id} not found" });
         }
 
+        // Invalidate caches
+        await InvalidateLibraryCache(id, updated.Owner);
+
         return Ok(MapToResponse(updated));
     }
 
@@ -172,7 +172,10 @@ cacheKey = $"libraries:owner:{owner}";
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [Pro// Get library first to invalidate owner cache
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> Delete(Guid id)
+    {
+        // Get library first to invalidate owner cache
         var library = await _libraryRepository.GetByIdAsync(id);
         
         var deleted = await _libraryRepository.DeleteAsync(id);
@@ -185,10 +188,7 @@ cacheKey = $"libraries:owner:{owner}";
         // Invalidate caches
         if (library != null)
         {
-            await InvalidateLibraryCache(id, library.Owner
-        if (!deleted)
-        {
-            return NotFound(new { message = $"Library with ID {id} not found" });
+            await InvalidateLibraryCache(id, library.Owner);
         }
 
         return NoContent();
@@ -197,7 +197,19 @@ cacheKey = $"libraries:owner:{owner}";
     /// <summary>
     /// Add books to a library
     /// </summary>
-    [Htt// Invalidate caches since book count changed
+    [HttpPost("{id:guid}/books")]
+    [ProducesResponseType(typeof(LibraryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<LibraryResponse>> AddBooks(Guid id, [FromBody] AddBooksToLibraryRequest request)
+    {
+        var updated = await _libraryRepository.AddBooksAsync(id, request.BookIds);
+        
+        if (updated == null)
+        {
+            return NotFound(new { message = $"Library with ID {id} not found" });
+        }
+
+        // Invalidate caches since book count changed
         await InvalidateLibraryCache(id, updated.Owner);
 
         return Ok(MapToResponse(updated));
@@ -235,19 +247,7 @@ cacheKey = $"libraries:owner:{owner}";
         // Remove owner's libraries cache
         await _cache.RemoveAsync($"libraries:owner:{owner}");
         
-        _logger.LogInformation("Invalidated cache for library {LibraryId} and owner {Owner}", libraryId, owner
-    [ProducesResponseType(typeof(LibraryResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<LibraryResponse>> RemoveBooks(Guid id, [FromBody] AddBooksToLibraryRequest request)
-    {
-        var updated = await _libraryRepository.RemoveBooksAsync(id, request.BookIds);
-        
-        if (updated == null)
-        {
-            return NotFound(new { message = $"Library with ID {id} not found" });
-        }
-
-        return Ok(MapToResponse(updated));
+        _logger.LogInformation("Invalidated cache for library {LibraryId} and owner {Owner}", libraryId, owner);
     }
 
     private static LibraryResponse MapToResponse(Library library) => new()
