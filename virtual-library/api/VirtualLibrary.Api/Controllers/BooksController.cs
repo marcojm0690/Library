@@ -161,13 +161,70 @@ public class BooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SearchByCover([FromBody] SearchByCoverRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.ExtractedText))
+        _logger.LogInformation("Cover search request - Text length: {TextLength}, Has image: {HasImage}", 
+            request.ExtractedText?.Length ?? 0, 
+            !string.IsNullOrWhiteSpace(request.ImageData));
+
+        // If image is provided, try image-based search first (priority)
+        if (!string.IsNullOrWhiteSpace(request.ImageData))
         {
-            return BadRequest(new { error = "Extracted text is required" });
+            try
+            {
+                _logger.LogInformation("Attempting image-based book identification...");
+                
+                // Convert Base64 to stream
+                var imageBytes = Convert.FromBase64String(request.ImageData);
+                using var imageStream = new MemoryStream(imageBytes);
+
+                var book = await _searchByImageService.IdentifyBookAsync(imageStream);
+
+                if (book != null)
+                {
+                    _logger.LogInformation("✅ Book identified from image: {Title}", book.Title);
+                    
+                    // Return single book result
+                    var response = new SearchBooksResponse
+                    {
+                        Books = new List<BookResponse>
+                        {
+                            new BookResponse
+                            {
+                                Id = book.Id,
+                                Title = book.Title,
+                                Authors = book.Authors,
+                                Isbn = book.Isbn,
+                                Publisher = book.Publisher,
+                                PublishYear = book.PublishYear,
+                                Description = book.Description,
+                                PageCount = book.PageCount,
+                                CoverImageUrl = book.CoverImageUrl,
+                                Source = "Image-based identification"
+                            }
+                        },
+                        TotalResults = 1
+                    };
+                    
+                    return Ok(response);
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ Image-based identification returned no results, falling back to text search");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error during image-based identification, falling back to text search");
+                // Continue to text-based search
+            }
         }
 
-        _logger.LogInformation("Cover search request with text length: {Length}", request.ExtractedText.Length);
+        // Fallback to text-based search if no image or image search failed
+        if (string.IsNullOrWhiteSpace(request.ExtractedText))
+        {
+            return BadRequest(new { error = "Either image data or extracted text is required" });
+        }
 
+        _logger.LogInformation("Using text-based cover search");
         var result = await _searchByCoverService.ExecuteAsync(request.ExtractedText);
 
         return Ok(result);

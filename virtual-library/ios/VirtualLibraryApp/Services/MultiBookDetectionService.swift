@@ -21,31 +21,41 @@ class MultiBookDetectionService {
             return []
         }
         
-        // Step 2: Extract text from each rectangle
+        // Step 2: Extract text and capture image from each rectangle
         var detectedBooks: [DetectedBook] = []
         
         for (index, rectangle) in rectangles.enumerated() {
             print("📖 Processing rectangle \(index + 1)/\(rectangles.count)")
             
-            if let text = await extractText(from: pixelBuffer, in: rectangle) {
-                // Clean and normalize extracted text
-                let cleanedText = cleanExtractedText(text)
+            // Capture the image of the rectangle first (priority)
+            let coverImage = captureImage(from: pixelBuffer, in: rectangle)
+            
+            // Also extract text as fallback/supplement
+            let text = await extractText(from: pixelBuffer, in: rectangle)
+            let cleanedText = text.map { cleanExtractedText($0) } ?? ""
+            
+            if let text = text {
                 print("✍️ Original text (\(text.count) chars): \(text.prefix(100))...")
                 print("🧹 Cleaned text (\(cleanedText.count) chars): \(cleanedText)")
-                
-                // Only use if we have meaningful text
-                guard !cleanedText.isEmpty, cleanedText.count >= 5 else {
-                    print("⚠️ Skipping - text too short or empty after cleaning")
-                    continue
-                }
-                
-                let detectedBook = DetectedBook(
-                    detectedText: cleanedText,
-                    isbn: nil,
-                    boundingBox: rectangle
-                )
-                detectedBooks.append(detectedBook)
             }
+            
+            // Require either image or meaningful text
+            let hasValidText = !cleanedText.isEmpty && cleanedText.count >= 5
+            let hasImage = coverImage != nil
+            
+            guard hasImage || hasValidText else {
+                print("⚠️ Skipping - no valid image or text")
+                continue
+            }
+            
+            // Use text if available, otherwise empty (image will be primary)
+            let detectedBook = DetectedBook(
+                detectedText: hasValidText ? cleanedText : "Image-based detection",
+                isbn: nil,
+                boundingBox: rectangle,
+                coverImage: coverImage
+            )
+            detectedBooks.append(detectedBook)
         }
         
         print("✅ Detection complete: \(detectedBooks.count) books with text detected")
@@ -73,6 +83,36 @@ class MultiBookDetectionService {
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
+    /// Capture an image from a specific region of the frame
+    private func captureImage(from pixelBuffer: CVPixelBuffer, in boundingBox: CGRect) -> UIImage? {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext()
+        
+        // Convert normalized coordinates to pixel coordinates
+        let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
+        let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
+        
+        // Vision coordinates have origin at bottom-left, need to flip Y
+        let rect = CGRect(
+            x: boundingBox.origin.x * width,
+            y: (1 - boundingBox.origin.y - boundingBox.height) * height,
+            width: boundingBox.width * width,
+            height: boundingBox.height * height
+        )
+        
+        // Crop the image to the bounding box
+        let croppedCIImage = ciImage.cropped(to: rect)
+        
+        guard let cgImage = context.createCGImage(croppedCIImage, from: croppedCIImage.extent) else {
+            print("⚠️ Failed to create CGImage from cropped image")
+            return nil
+        }
+        
+        let image = UIImage(cgImage: cgImage)
+        print("📸 Captured cover image: \(Int(image.size.width))x\(Int(image.size.height))")
+        return image
+    }
+    
     /// Detect rectangular shapes (potential books) in the frame
     private func detectRectangles(in pixelBuffer: CVPixelBuffer) async -> [CGRect] {
         return await withCheckedContinuation { continuation in
@@ -84,31 +124,49 @@ class MultiBookDetectionService {
                 }
                 
                 guard let observations = request.results as? [VNRectangleObservation] else {
+                    print("⚠️ No rectangle observations found")
                     continuation.resume(returning: [])
                     return
                 }
                 
-                // Filter and sort rectangles
+                print("🔍 Raw rectangle observations: \(observations.count)")
+                
+                // Log all observations for debugging
+                for (i, obs) in observations.enumerated() {
+                    print("  Rectangle \(i+1): confidence=\(obs.confidence), size=\(obs.boundingBox.width)x\(obs.boundingBox.height), area=\(obs.boundingBox.width * obs.boundingBox.height)")
+                }
+                
+                // Filter and sort rectangles - more lenient settings
                 let rectangles = observations
                     .filter { observation in
-                        // Filter by confidence and size
-                        observation.confidence > 0.3 &&
-                        observation.boundingBox.width > 0.1 &&
-                        observation.boundingBox.height > 0.1
+                        // More lenient filtering
+                        let minConfidence: Float = 0.2  // Lower confidence threshold
+                        let minWidth: CGFloat = 0.08    // Smaller minimum width
+                        let minHeight: CGFloat = 0.08   // Smaller minimum height
+                        
+                        let passes = observation.confidence > minConfidence &&
+                                    observation.boundingBox.width > minWidth &&
+                                    observation.boundingBox.height > minHeight
+                        
+                        if !passes {
+                            print("  ❌ Filtered out: confidence=\(observation.confidence), size=\(observation.boundingBox.width)x\(observation.boundingBox.height)")
+                        }
+                        return passes
                     }
                     .sorted { $0.boundingBox.width * $0.boundingBox.height > $1.boundingBox.width * $1.boundingBox.height }
-                    .prefix(3) // Take top 3 largest rectangles
+                    .prefix(5) // Take top 5 largest rectangles
                     .map { $0.boundingBox }
                 
                 print("📦 Filtered to \(rectangles.count) valid rectangles")
                 continuation.resume(returning: Array(rectangles))
             }
             
-            // Configure rectangle detection
-            request.minimumAspectRatio = 0.3
-            request.maximumAspectRatio = 1.5
-            request.minimumSize = 0.1
-            request.maximumObservations = 5
+            // Configure rectangle detection - more lenient settings
+            request.minimumAspectRatio = 0.2   // Allow wider range (was 0.3)
+            request.maximumAspectRatio = 2.0   // Allow taller rectangles (was 1.5)
+            request.minimumSize = 0.05         // Smaller minimum size (was 0.1)
+            request.minimumConfidence = 0.2    // Lower confidence threshold
+            request.maximumObservations = 10   // More observations (was 5)
             
             let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
             
@@ -171,26 +229,27 @@ class MultiBookDetectionService {
         }
     }
     
-    /// Fetch book details from API using the full extracted text
-    /// Returns array of books that match the detected text
+    /// Fetch book details from API using cover image (priority) and text (fallback)
+    /// Returns array of books that match the detected image/text
     func fetchBookDetails(for detectedBook: DetectedBook) async -> [Book] {
         print("📡 fetchBookDetails called for detection: \(detectedBook.id)")
-        print("   Full text: '\(detectedBook.detectedText)'")
+        print("   Has cover image: \(detectedBook.coverImage != nil)")
+        print("   Text: '\(detectedBook.detectedText)'")
         print("   Text length: \(detectedBook.detectedText.count) chars")
         
-        // Use the full extracted text for API search
-        let searchText = detectedBook.detectedText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard !searchText.isEmpty else {
-            print("⚠️ No text available for search")
-            return []
+        // Prioritize image search, use text as supplement
+        if detectedBook.coverImage != nil {
+            print("🖼️ Searching primarily by cover image...")
+        } else {
+            print("✍️ Searching by text only (no image available)...")
         }
         
-        print("🔍 Searching by full OCR text...")
-        print("   Search query: '\(searchText)'")
+        // Use text or placeholder if image-only
+        let searchText = detectedBook.detectedText.trimmingCharacters(in: .whitespacesAndNewlines)
         
         do {
-            let books = try await apiService.searchByCover(searchText)
+            // Send both image (priority) and text (supplement) to API
+            let books = try await apiService.searchByCover(searchText, coverImage: detectedBook.coverImage)
             print("📊 API returned \(books.count) books")
             return books
         } catch {

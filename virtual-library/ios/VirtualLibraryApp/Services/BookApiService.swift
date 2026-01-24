@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Service responsible for communicating with the Virtual Library API.
 /// Handles all network requests using async/await pattern.
@@ -76,20 +77,35 @@ class BookApiService: ObservableObject {
         }
     }
     
-    /// Search for books by cover text (OCR results)
-    /// - Parameter extractedText: Text extracted from the book cover
+    /// Search for books by cover text (OCR results) and/or image
+    /// - Parameters:
+    ///   - extractedText: Text extracted from the book cover
+    ///   - coverImage: Optional cover image for visual search
     /// - Returns: List of potential book matches
-    func searchByCover(_ extractedText: String) async throws -> [Book] {
+    func searchByCover(_ extractedText: String, coverImage: UIImage? = nil) async throws -> [Book] {
         let url = URL(string: "\(baseURL)/api/books/search-by-cover")!
         
         print("📡 API Request: POST \(url)")
         print("📦 Extracted Text: \(extractedText)")
         
+        // Convert image to base64 if provided
+        var imageDataBase64: String? = nil
+        if let image = coverImage {
+            // Resize image to reduce payload size
+            let maxDimension: CGFloat = 800
+            let resizedImage = resizeImage(image, maxDimension: maxDimension)
+            
+            if let imageData = resizedImage.jpegData(compressionQuality: 0.7) {
+                imageDataBase64 = imageData.base64EncodedString()
+                print("📸 Sending cover image: \(imageData.count) bytes (base64: \(imageDataBase64!.count) chars)")
+            }
+        }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let requestBody = SearchByCoverRequest(extractedText: extractedText, imageData: nil)
+        let requestBody = SearchByCoverRequest(extractedText: extractedText, imageData: imageDataBase64)
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         await MainActor.run { isLoading = true }
@@ -210,6 +226,26 @@ class BookApiService: ObservableObject {
               (200...299).contains(httpResponse.statusCode) else {
             throw APIError.invalidResponse
         }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Resize image to fit within max dimension while maintaining aspect ratio
+    private func resizeImage(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let size = image.size
+        let ratio = maxDimension / max(size.width, size.height)
+        
+        // If image is already smaller, return as-is
+        guard ratio < 1 else { return image }
+        
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        return resizedImage ?? image
     }
 }
 

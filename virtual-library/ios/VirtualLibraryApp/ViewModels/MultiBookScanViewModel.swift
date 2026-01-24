@@ -12,6 +12,8 @@ class MultiBookScanViewModel: ObservableObject {
     private let detectionService: MultiBookDetectionService
     private var lastProcessTime: Date = .distantPast
     private let processingInterval: TimeInterval = 2.0 // Process every 2 seconds
+    private let maxDetectedBooks = 3 // Limit to reduce API calls
+    private var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
     
     init(apiService: BookApiService) {
         self.detectionService = MultiBookDetectionService(apiService: apiService)
@@ -53,6 +55,12 @@ class MultiBookScanViewModel: ObservableObject {
         var updatedBooks = detectedBooks // Start with existing books
         
         for detection in newDetections {
+            // Check if this book was already added and should be ignored
+            if ignoredTexts.contains(where: { similarity(between: $0, and: detection.detectedText) > 0.7 }) {
+                // Skip this detection - book was already added
+                continue
+            }
+            
             // Check if we already have this rectangle confirmed (by text similarity)
             if let existingBook = detectedBooks.first(where: { 
                 $0.isConfirmed && similarity(between: $0.detectedText, and: detection.detectedText) > 0.7 
@@ -71,18 +79,24 @@ class MultiBookScanViewModel: ObservableObject {
                 continue
             }
             
+            // Check if we've reached the max limit
+            let confirmedCount = updatedBooks.filter { $0.isConfirmed }.count
+            guard confirmedCount < maxDetectedBooks else {
+                // Don't fetch more books if we've reached the limit
+                continue
+            }
+            
             // New detection - fetch details
             overlays.append((rect: detection.boundingBox, hasBook: false))
             let books = await detectionService.fetchBookDetails(for: detection)
             
             if !books.isEmpty {
-                // Create a DetectedBook for each result
-                for book in books {
-                    var confirmedDetection = detection
-                    confirmedDetection.book = book
-                    confirmedDetection.isConfirmed = true
-                    updatedBooks.append(confirmedDetection)
-                }
+                // Only take the first (best match) book to avoid cluttering UI
+                let bestMatch = books.first!
+                var confirmedDetection = detection
+                confirmedDetection.book = bestMatch
+                confirmedDetection.isConfirmed = true
+                updatedBooks.append(confirmedDetection)
                 
                 // Update overlay to green for this rectangle
                 if let index = overlays.firstIndex(where: { $0.rect == detection.boundingBox }) {
@@ -97,7 +111,16 @@ class MultiBookScanViewModel: ObservableObject {
     }
     
     func removeDetection(_ detectedBook: DetectedBook) {
+        // Just remove from list - does NOT add to ignored list
+        // This allows the same book to be detected again if user wants
         detectedBooks.removeAll { $0.id == detectedBook.id }
+        
+        // Also remove its overlay
+        rectangleOverlays.removeAll { overlay in
+            overlay.rect == detectedBook.boundingBox
+        }
+        
+        print("🗑️ Removed detection - book can be scanned again")
     }
     
     func addBookToLibrary(_ detectedBook: DetectedBook, libraryId: UUID) async {
@@ -113,11 +136,29 @@ class MultiBookScanViewModel: ObservableObject {
         
         do {
             try await detectionService.apiService.addBooksToLibrary(libraryId: libraryId, bookIds: [bookId])
-            // Remove from detected books after adding
+            
+            // Add to ignored texts so we don't detect this book again
+            ignoredTexts.insert(detectedBook.detectedText)
+            
+            // Remove from detected books and overlays
             detectedBooks.removeAll { $0.id == detectedBook.id }
+            
+            // Remove the overlay for this specific book
+            rectangleOverlays.removeAll { overlay in
+                // Check if overlay matches this detection's bounding box
+                overlay.rect == detectedBook.boundingBox
+            }
+            
+            print("✅ Book added and ignored for future scans")
         } catch {
             errorMessage = "Error al agregar el libro: \(error.localizedDescription)"
         }
+    }
+    
+    func clearIgnoredBooks() {
+        // Reset ignored books list (useful when restarting scan session)
+        ignoredTexts.removeAll()
+        print("🔄 Cleared ignored books list")
     }
     
     // MARK: - Helper Methods
