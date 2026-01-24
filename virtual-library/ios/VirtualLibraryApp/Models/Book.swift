@@ -95,3 +95,18 @@ struct SearchByCoverRequest: Codable {
         case imageData = "ImageData"
     }
 }
+
+/// Request model for saving a book
+struct SaveBookRequest: Codable {
+    let id: UUID?
+    let title: String
+    let authors: [String]?
+    let isbn: String?
+    let publisher: String?
+    let publishYear: Int?
+    let pageCount: Int?
+    let description: String?
+    let coverImageUrl: String?
+    let source: String?
+    let externalId: String?
+}

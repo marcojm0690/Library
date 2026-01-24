@@ -198,14 +198,38 @@ public class LibrariesController : ControllerBase
     }
 
     /// <summary>
-    /// Add books to a library
+    /// Add books to a library (ensures books exist in database first)
     /// </summary>
     [HttpPost("{id:guid}/books")]
     [ProducesResponseType(typeof(LibraryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LibraryResponse>> AddBooks(Guid id, [FromBody] AddBooksToLibraryRequest request)
     {
-        var updated = await _libraryRepository.AddBooksAsync(id, request.BookIds);
+        _logger.LogInformation("Adding {Count} books to library {LibraryId}", request.BookIds.Count, id);
+        
+        // Ensure all books exist in the database
+        var validBookIds = new List<Guid>();
+        foreach (var bookId in request.BookIds)
+        {
+            var book = await _bookRepository.GetByIdAsync(bookId);
+            if (book != null)
+            {
+                validBookIds.Add(bookId);
+                _logger.LogInformation("Book {BookId} exists: {Title}", bookId, book.Title);
+            }
+            else
+            {
+                _logger.LogWarning("Book {BookId} not found in database - skipping", bookId);
+            }
+        }
+        
+        if (validBookIds.Count == 0)
+        {
+            _logger.LogWarning("No valid books found to add to library {LibraryId}", id);
+            return BadRequest(new { message = "None of the provided book IDs exist in the database" });
+        }
+        
+        var updated = await _libraryRepository.AddBooksAsync(id, validBookIds);
         
         if (updated == null)
         {
@@ -215,6 +239,7 @@ public class LibrariesController : ControllerBase
         // Invalidate caches since book count changed
         await InvalidateLibraryCache(id, updated.Owner);
 
+        _logger.LogInformation("Successfully added {Count} books to library {LibraryId}", validBookIds.Count, id);
         return Ok(MapToResponse(updated));
     }
 
@@ -236,12 +261,16 @@ public class LibrariesController : ControllerBase
             return NotFound(new { message = $"Library with ID {id} not found" });
         }
 
+        _logger.LogInformation("Fetching {Count} books for library {LibraryId}", library.BookIds.Count, id);
+
         var books = new List<BookResponse>();
         foreach (var bookId in library.BookIds)
         {
+            _logger.LogInformation("Looking for book {BookId}", bookId);
             var book = await bookRepository.GetByIdAsync(bookId);
             if (book != null)
             {
+                _logger.LogInformation("Found book: {Title}", book.Title);
                 // Try to enrich book data from external APIs if missing critical info
                 var enrichedBook = await EnrichBookDataAsync(book, bookProviders);
                 
@@ -259,8 +288,13 @@ public class LibrariesController : ControllerBase
                     Source = enrichedBook.Source
                 });
             }
+            else
+            {
+                _logger.LogWarning("Book {BookId} not found in repository", bookId);
+            }
         }
 
+        _logger.LogInformation("Returning {Count} books for library {LibraryId}", books.Count, id);
         return Ok(books);
     }
 

@@ -68,3 +68,21 @@ public record IdentifyBookByImageRequest
     /// </summary>
     public string ImageFormat { get; init; } = "jpg";
 }
+
+/// <summary>
+/// Request DTO for saving a book to the database
+/// </summary>
+public record SaveBookRequest
+{
+    public Guid? Id { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public List<string>? Authors { get; init; }
+    public string? Isbn { get; init; }
+    public string? Publisher { get; init; }
+    public int? PublishYear { get; init; }
+    public int? PageCount { get; init; }
+    public string? Description { get; init; }
+    public string? CoverImageUrl { get; init; }
+    public string? Source { get; init; }
+    public string? ExternalId { get; init; }
+}

@@ -137,18 +137,23 @@ class MultiBookScanViewModel: ObservableObject {
         
         print("   Book: \(book.title) by \(book.authors.joined(separator: ", "))")
         
-        guard let bookId = book.id else {
-            print("❌ [addBookToLibrary] Book ID is nil")
-            errorMessage = "ID del libro no disponible"
-            return
-        }
-        
-        print("   Book ID: \(bookId.uuidString)")
-        
         do {
-            print("🔄 [addBookToLibrary] Calling API...")
+            // Step 1: Save book to database first
+            print("🔄 [addBookToLibrary] Step 1: Saving book to database...")
+            let savedBook = try await detectionService.apiService.saveBook(book)
+            
+            guard let bookId = savedBook.id else {
+                print("❌ [addBookToLibrary] Saved book has no ID")
+                errorMessage = "Error al guardar el libro"
+                return
+            }
+            
+            print("   Saved Book ID: \(bookId.uuidString)")
+            
+            // Step 2: Add book to library
+            print("🔄 [addBookToLibrary] Step 2: Adding book to library...")
             try await detectionService.apiService.addBooksToLibrary(libraryId: libraryId, bookIds: [bookId])
-            print("✅ [addBookToLibrary] API call successful")
+            print("✅ [addBookToLibrary] Book successfully added to library")
             
             // Add to ignored texts so we don't detect this book again
             ignoredTexts.insert(detectedBook.detectedText)

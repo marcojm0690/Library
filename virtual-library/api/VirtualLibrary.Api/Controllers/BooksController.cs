@@ -66,6 +66,72 @@ public class BooksController : ControllerBase
     }
 
     /// <summary>
+    /// Save a book to the database (create or update).
+    /// </summary>
+    /// <param name="request">Book information to save</param>
+    /// <returns>Saved book information with ID</returns>
+    [HttpPost]
+    [ProducesResponseType(typeof(BookResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BookResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SaveBook([FromBody] SaveBookRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest(new { error = "Title is required" });
+        }
+
+        try
+        {
+            var book = new Domain.Book
+            {
+                Id = request.Id ?? Guid.NewGuid(),
+                Title = request.Title,
+                Authors = request.Authors ?? new List<string>(),
+                Isbn = request.Isbn,
+                Publisher = request.Publisher,
+                PublishYear = request.PublishYear,
+                PageCount = request.PageCount,
+                Description = request.Description,
+                CoverImageUrl = request.CoverImageUrl,
+                Source = request.Source,
+                ExternalId = request.ExternalId
+            };
+
+            _logger.LogInformation("Saving book: {Title} (ID: {BookId})", book.Title, book.Id);
+
+            var savedBook = await _bookRepository.SaveAsync(book);
+
+            var response = new BookResponse
+            {
+                Id = savedBook.Id,
+                Title = savedBook.Title,
+                Authors = savedBook.Authors,
+                Description = savedBook.Description,
+                Isbn = savedBook.Isbn,
+                Publisher = savedBook.Publisher,
+                PublishYear = savedBook.PublishYear,
+                PageCount = savedBook.PageCount,
+                CoverImageUrl = savedBook.CoverImageUrl,
+                Source = savedBook.Source
+            };
+
+            var isNew = request.Id == null || request.Id == Guid.Empty;
+            if (isNew)
+            {
+                return CreatedAtAction(nameof(GetById), new { id = savedBook.Id }, response);
+            }
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving book: {Title}", request.Title);
+            return StatusCode(500, new { error = "Error saving book", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get a book by its internal ID.
     /// </summary>
     /// <param name="id">The book's unique identifier</param>

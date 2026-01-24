@@ -156,6 +156,73 @@ class BookApiService: ObservableObject {
         }
     }
     
+    /// Save a book to the database
+    /// - Parameter book: Book to save
+    /// - Returns: Saved book with ID
+    func saveBook(_ book: Book) async throws -> Book {
+        let url = URL(string: "\(baseURL)/api/books")!
+        
+        print("🔵 [API] Saving book to database")
+        print("   URL: \(url.absoluteString)")
+        print("   Title: \(book.title)")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Convert Book to SaveBookRequest
+        let saveRequest = SaveBookRequest(
+            id: book.id,
+            title: book.title,
+            authors: book.authors,
+            isbn: book.isbn,
+            publisher: book.publisher,
+            publishYear: book.publishYear,
+            pageCount: book.pageCount,
+            description: book.description,
+            coverImageUrl: book.coverImageUrl,
+            source: book.source,
+            externalId: nil
+        )
+        
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(saveRequest)
+        
+        if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("   Request body: \(bodyString)")
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [API] Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 [API] Response status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("🔵 [API] Response body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ [API] HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            let decoder = JSONDecoder()
+            let bookResponse = try decoder.decode(BookResponse.self, from: data)
+            let savedBook = bookResponse.toBook()
+            
+            print("✅ [API] Book saved with ID: \(savedBook.id?.uuidString ?? "nil")")
+            return savedBook
+        } catch {
+            print("❌ [API] Error saving book: \(error)")
+            throw error
+        }
+    }
+    
     // MARK: - Library Management
     
     /// Get all libraries
