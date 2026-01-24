@@ -126,33 +126,49 @@ class MultiBookScanViewModel: ObservableObject {
     }
     
     func addBookToLibrary(_ detectedBook: DetectedBook, libraryId: UUID) async {
+        print("📚 [addBookToLibrary] Starting...")
+        print("   Library ID: \(libraryId.uuidString)")
+        
         guard let book = detectedBook.book else { 
+            print("❌ [addBookToLibrary] No book details available")
             errorMessage = "Book details not available"
             return 
         }
         
+        print("   Book: \(book.title) by \(book.authors.joined(separator: ", "))")
+        
         guard let bookId = book.id else {
+            print("❌ [addBookToLibrary] Book ID is nil")
             errorMessage = "ID del libro no disponible"
             return
         }
         
+        print("   Book ID: \(bookId.uuidString)")
+        
         do {
+            print("🔄 [addBookToLibrary] Calling API...")
             try await detectionService.apiService.addBooksToLibrary(libraryId: libraryId, bookIds: [bookId])
+            print("✅ [addBookToLibrary] API call successful")
             
             // Add to ignored texts so we don't detect this book again
             ignoredTexts.insert(detectedBook.detectedText)
+            print("   Added to ignored list: \(detectedBook.detectedText)")
             
             // Remove from detected books and overlays
+            let beforeCount = detectedBooks.count
             detectedBooks.removeAll { $0.id == detectedBook.id }
+            print("   Removed from list (\(beforeCount) → \(detectedBooks.count))")
             
             // Remove the overlay for this specific book
+            let beforeOverlays = rectangleOverlays.count
             rectangleOverlays.removeAll { overlay in
-                // Check if overlay matches this detection's bounding box
                 overlay.rect == detectedBook.boundingBox
             }
+            print("   Removed overlay (\(beforeOverlays) → \(rectangleOverlays.count))")
             
-            print("✅ Book added and ignored for future scans")
+            print("✅ [addBookToLibrary] Complete - Book added and ignored for future scans")
         } catch {
+            print("❌ [addBookToLibrary] Error: \(error)")
             errorMessage = "Error al agregar el libro: \(error.localizedDescription)"
         }
     }

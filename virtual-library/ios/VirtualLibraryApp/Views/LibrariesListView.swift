@@ -85,7 +85,9 @@ struct LibrariesListView: View {
     var librariesList: some View {
         List {
             ForEach(viewModel.libraries) { library in
-                LibraryRowView(library: library)
+                NavigationLink(destination: LibraryDetailView(library: library)) {
+                    LibraryRowView(library: library)
+                }
             }
         }
     }

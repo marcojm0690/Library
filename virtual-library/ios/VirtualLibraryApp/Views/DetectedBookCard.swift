@@ -7,10 +7,13 @@ struct DetectedBookCard: View {
     @State private var offset: CGFloat = 0
     @State private var isSwipeComplete = false
     @State private var isExpanded = false
+    @State private var showSuccessFeedback = false
+    @State private var showErrorFeedback = false
     
     // Haptic feedback
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
-    private let swipeThreshold: CGFloat = 80
+    private let successHaptic = UINotificationFeedbackGenerator()
+    private let swipeThreshold: CGFloat = 100
     
     var body: some View {
         ZStack {
@@ -72,13 +75,15 @@ struct DetectedBookCard: View {
             // Main card content
             cardContent
                 .offset(x: offset)
-                .rotationEffect(.degrees(Double(offset) / 20.0))
+                .rotationEffect(.degrees(Double(offset) / 25.0))
+                .scaleEffect(abs(offset) > swipeThreshold ? 0.95 : 1.0)
                 .gesture(
-                    DragGesture()
+                    DragGesture(minimumDistance: 10)
                         .onChanged { gesture in
                             guard detectedBook.book != nil else { return }
                             offset = gesture.translation.width
                             
+                            // Haptic feedback when crossing threshold
                             if abs(gesture.translation.width) > swipeThreshold && abs(offset - gesture.translation.width) < 5 {
                                 haptic.impactOccurred()
                             }
@@ -87,27 +92,52 @@ struct DetectedBookCard: View {
                             guard detectedBook.book != nil else { return }
                             
                             if offset < -swipeThreshold {
-                                haptic.impactOccurred()
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                    offset = -500
+                                // Swipe left to add
+                                successHaptic.notificationOccurred(.success)
+                                showSuccessFeedback = true
+                                
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                                    offset = -600
                                 }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                     onAdd()
                                 }
                             } else if offset > swipeThreshold {
+                                // Swipe right to dismiss
                                 haptic.impactOccurred()
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                    offset = 500
+                                
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                                    offset = 600
                                 }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                     onDismiss()
                                 }
                             } else {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                // Return to center
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                     offset = 0
                                 }
                             }
                         }
+                )
+                .overlay(
+                    // Success checkmark overlay
+                    Group {
+                        if showSuccessFeedback {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 60, height: 60)
+                                
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 30, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                 )
         }
         .padding(.horizontal, 4)

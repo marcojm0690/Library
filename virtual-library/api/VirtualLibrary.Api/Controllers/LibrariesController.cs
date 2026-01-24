@@ -216,6 +216,46 @@ public class LibrariesController : ControllerBase
     }
 
     /// <summary>
+    /// Get books in a library
+    /// </summary>
+    [HttpGet("{id:guid}/books")]
+    [ProducesResponseType(typeof(IEnumerable<BookResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IEnumerable<BookResponse>>> GetLibraryBooks(Guid id, [FromServices] IBookRepository bookRepository)
+    {
+        var library = await _libraryRepository.GetByIdAsync(id);
+        
+        if (library == null)
+        {
+            return NotFound(new { message = $"Library with ID {id} not found" });
+        }
+
+        var books = new List<BookResponse>();
+        foreach (var bookId in library.BookIds)
+        {
+            var book = await bookRepository.GetByIdAsync(bookId);
+            if (book != null)
+            {
+                books.Add(new BookResponse
+                {
+                    Id = book.Id,
+                    Title = book.Title,
+                    Authors = book.Authors,
+                    Description = book.Description,
+                    Isbn = book.Isbn,
+                    Publisher = book.Publisher,
+                    PublishYear = book.PublishYear,
+                    PageCount = book.PageCount,
+                    CoverImageUrl = book.CoverImageUrl,
+                    Source = book.Source
+                });
+            }
+        }
+
+        return Ok(books);
+    }
+
+    /// <summary>
     /// Remove books from a library
     /// </summary>
     [HttpDelete("{id:guid}/books")]

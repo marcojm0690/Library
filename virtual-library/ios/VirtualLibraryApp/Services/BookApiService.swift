@@ -263,9 +263,48 @@ class BookApiService: ObservableObject {
         }
     }
     
+    /// Get books in a library
+    func getBooksInLibrary(libraryId: UUID) async throws -> [Book] {
+        let url = URL(string: "\(baseURL)/api/libraries/\(libraryId.uuidString)/books")!
+        
+        print("🔵 [API] Getting books in library")
+        print("   URL: \(url.absoluteString)")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [API] Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 [API] Response status: \(httpResponse.statusCode)")
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ [API] HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let bookResponses = try decoder.decode([BookResponse].self, from: data)
+            let books = bookResponses.map { $0.toBook() }
+            print("✅ [API] Loaded \(books.count) books")
+            return books
+        } catch {
+            print("❌ [API] Error getting library books: \(error)")
+            throw error
+        }
+    }
+    
     /// Add books to a library
     func addBooksToLibrary(libraryId: UUID, bookIds: [UUID]) async throws {
         let url = URL(string: "\(baseURL)/api/libraries/\(libraryId.uuidString)/books")!
+        
+        print("🔵 [API] Adding books to library")
+        print("   URL: \(url.absoluteString)")
+        print("   Library ID: \(libraryId.uuidString)")
+        print("   Book IDs: \(bookIds.map { $0.uuidString })")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -274,11 +313,33 @@ class BookApiService: ObservableObject {
         let requestBody = ["bookIds": bookIds.map { $0.uuidString }]
         request.httpBody = try JSONEncoder().encode(requestBody)
         
-        let (_, response) = try await URLSession.shared.data(for: request)
+        if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("   Request body: \(bodyString)")
+        }
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.invalidResponse
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [API] Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 [API] Response status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8), !responseString.isEmpty {
+                print("🔵 [API] Response body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ [API] HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            print("✅ [API] Books added successfully")
+        } catch {
+            print("❌ [API] Error adding books: \(error)")
+            throw error
         }
     }
     
