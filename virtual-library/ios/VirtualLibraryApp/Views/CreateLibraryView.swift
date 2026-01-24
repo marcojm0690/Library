@@ -35,6 +35,9 @@ struct CreateLibraryView: View {
                     HStack {
                         TextField("Add tag", text: $viewModel.currentTag)
                             .autocapitalization(.none)
+                            .onSubmit {
+                                viewModel.addTag()
+                            }
                         
                         Button(action: {
                             viewModel.addTag()
@@ -42,6 +45,7 @@ struct CreateLibraryView: View {
                             Image(systemName: "plus.circle.fill")
                                 .foregroundColor(.blue)
                         }
+                        .buttonStyle(.borderless)
                         .disabled(viewModel.currentTag.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                     
@@ -84,6 +88,10 @@ struct CreateLibraryView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Create") {
                         Task {
+                            print("🔵 Create button tapped")
+                            print("🔵 User ID: \(authService.user?.id ?? "nil")")
+                            print("🔵 Library name: \(viewModel.name)")
+                            print("🔵 Is valid: \(viewModel.isValid)")
                             await createLibraryWithUser()
                         }
                     }
@@ -108,7 +116,15 @@ struct CreateLibraryView: View {
     }
     
     private func createLibraryWithUser() async {
-        guard let userId = authService.user?.id else { return }
+        print("🔵 createLibraryWithUser called")
+        
+        guard let userId = authService.user?.id else {
+            print("❌ No user ID found")
+            viewModel.error = "User not logged in"
+            return
+        }
+        
+        print("✅ User ID: \(userId)")
         
         // Create new view model with user ID
         let vm = CreateLibraryViewModel(userId: userId)
@@ -117,11 +133,18 @@ struct CreateLibraryView: View {
         vm.tags = viewModel.tags
         vm.isPublic = viewModel.isPublic
         
+        print("🔵 Calling createLibrary...")
         await vm.createLibrary()
         
+        print("🔵 createLibrary finished")
+        print("🔵 Created library: \(vm.createdLibrary?.name ?? "nil")")
+        print("🔵 Error: \(vm.error ?? "nil")")
+        
         if vm.createdLibrary != nil {
+            print("✅ Library created successfully, dismissing view")
             dismiss()
         } else if let error = vm.error {
+            print("❌ Setting error: \(error)")
             viewModel.error = error
         }
     }
@@ -152,4 +175,5 @@ struct TagView: View {
 
 #Preview {
     CreateLibraryView()
+        .environmentObject(AuthenticationService())
 }

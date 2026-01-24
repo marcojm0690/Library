@@ -28,11 +28,24 @@ class CreateLibraryViewModel: ObservableObject {
     
     /// Add a tag to the list
     func addTag() {
+        print("🔵 addTag called with currentTag: '\(currentTag)'")
         let trimmed = currentTag.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, !tags.contains(trimmed) else { return }
+        print("🔵 Trimmed tag: '\(trimmed)'")
+        
+        guard !trimmed.isEmpty else {
+            print("❌ Tag is empty after trimming")
+            return
+        }
+        
+        guard !tags.contains(trimmed) else {
+            print("❌ Tag already exists: '\(trimmed)'")
+            return
+        }
         
         tags.append(trimmed)
         currentTag = ""
+        print("✅ Tag added successfully. Total tags: \(tags.count)")
+        print("✅ Tags: \(tags)")
     }
     
     /// Remove a tag from the list

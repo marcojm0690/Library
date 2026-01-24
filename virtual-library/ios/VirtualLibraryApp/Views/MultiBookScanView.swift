@@ -141,7 +141,7 @@ struct MultiBookScanView: View {
                 detectedBooksHeader
                 detectedBooksScrollView
             }
-            .frame(maxHeight: 280)
+            .frame(maxHeight: 400)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -189,6 +189,7 @@ struct MultiBookScanView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .padding(.bottom, 20)
         }
         .background(Color.black.opacity(0.4))
     }

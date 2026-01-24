@@ -145,4 +145,5 @@ struct FeatureButton: View {
 
 #Preview {
     HomeView()
+        .environmentObject(AuthenticationService())
 }

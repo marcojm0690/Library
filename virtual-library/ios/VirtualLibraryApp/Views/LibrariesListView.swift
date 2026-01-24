@@ -29,8 +29,16 @@ struct LibrariesListView: View {
                 }
             }
         }
-        .sheet(isPresented: $showCreateLibrary) {
+        .sheet(isPresented: $showCreateLibrary, onDismiss: {
+            // Refresh libraries when sheet is dismissed
+            Task {
+                if let userId = authService.user?.id {
+                    await viewModel.refresh(for: userId)
+                }
+            }
+        }) {
             CreateLibraryView()
+                .environmentObject(authService)
         }
         .task {
             if let userId = authService.user?.id {

@@ -178,6 +178,9 @@ class BookApiService: ObservableObject {
     func createLibrary(_ request: CreateLibraryRequest) async throws -> Library {
         let url = URL(string: "\(baseURL)/api/libraries")!
         
+        print("🔵 Creating library at: \(url.absoluteString)")
+        print("🔵 Request data: name=\(request.name), owner=\(request.owner), tags=\(request.tags ?? [])")
+        
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -185,16 +188,38 @@ class BookApiService: ObservableObject {
         let encoder = JSONEncoder()
         urlRequest.httpBody = try encoder.encode(request)
         
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.invalidResponse
+        if let body = urlRequest.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("🔵 Request body: \(bodyString)")
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(Library.self, from: data)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 Response status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("🔵 Response body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let library = try decoder.decode(Library.self, from: data)
+            print("✅ Library created successfully: \(library.name)")
+            return library
+        } catch {
+            print("❌ Error creating library: \(error)")
+            throw error
+        }
     }
     
     /// Get libraries by owner
@@ -202,17 +227,33 @@ class BookApiService: ObservableObject {
         let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner
         let url = URL(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)")!
         
+        print("🔵 Loading libraries for owner: \(owner)")
+        print("🔵 Request URL: \(url.absoluteString)")
+        
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 Response status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("🔵 Response body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ HTTP error: \(httpResponse.statusCode)")
                 throw APIError.invalidResponse
             }
             
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode([Library].self, from: data)
+            let libraries = try decoder.decode([Library].self, from: data)
+            print("✅ Decoded \(libraries.count) libraries")
+            return libraries
         } catch let urlError as URLError where urlError.code == .cancelled {
             // Request was cancelled, just rethrow without logging error
             throw urlError

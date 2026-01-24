@@ -14,6 +14,8 @@ class MultiBookScanViewModel: ObservableObject {
     private let processingInterval: TimeInterval = 2.0 // Process every 2 seconds
     private let maxDetectedBooks = 3 // Limit to reduce API calls
     private var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
+    private var lastDetectionTime: Date = .distantPast
+    private let detectionPersistDuration: TimeInterval = 30.0 // Keep detections for 30 seconds
     
     init(apiService: BookApiService) {
         self.detectionService = MultiBookDetectionService(apiService: apiService)
@@ -50,42 +52,28 @@ class MultiBookScanViewModel: ObservableObject {
         
         let newDetections = await detectionService.detectBooks(in: pixelBuffer)
         
+        // Clear previous detections only if enough time has passed since last detection
+        let timeSinceLastDetection = Date().timeIntervalSince(lastDetectionTime)
+        if !newDetections.isEmpty && timeSinceLastDetection > detectionPersistDuration {
+            print("🧹 [ViewModel] Clearing previous detections - \(String(format: "%.1f", timeSinceLastDetection))s elapsed")
+            detectedBooks.removeAll()
+            ignoredTexts.removeAll()
+            lastDetectionTime = Date()
+        } else if !newDetections.isEmpty && !detectedBooks.isEmpty {
+            // If we have existing detections and time hasn't elapsed, keep them
+            print("⏰ [ViewModel] Keeping existing detections - only \(String(format: "%.1f", timeSinceLastDetection))s elapsed")
+            isProcessing = false
+            return
+        } else if !newDetections.isEmpty {
+            // First detection
+            lastDetectionTime = Date()
+        }
+        
         // Update rectangles with their status
         var overlays: [(rect: CGRect, hasBook: Bool)] = []
-        var updatedBooks = detectedBooks // Start with existing books
+        var updatedBooks: [DetectedBook] = [] // Start fresh
         
         for detection in newDetections {
-            // Check if this book was already added and should be ignored
-            if ignoredTexts.contains(where: { similarity(between: $0, and: detection.detectedText) > 0.7 }) {
-                // Skip this detection - book was already added
-                continue
-            }
-            
-            // Check if we already have this rectangle confirmed (by text similarity)
-            if let existingBook = detectedBooks.first(where: { 
-                $0.isConfirmed && similarity(between: $0.detectedText, and: detection.detectedText) > 0.7 
-            }) {
-                // Already confirmed - keep showing green rectangle and don't re-fetch
-                overlays.append((rect: detection.boundingBox, hasBook: true))
-                continue
-            }
-            
-            // Check if we're already fetching this detection
-            if let existingUnconfirmed = detectedBooks.first(where: {
-                !$0.isConfirmed && similarity(between: $0.detectedText, and: detection.detectedText) > 0.7
-            }) {
-                // Already processing - show red while waiting
-                overlays.append((rect: detection.boundingBox, hasBook: false))
-                continue
-            }
-            
-            // Check if we've reached the max limit
-            let confirmedCount = updatedBooks.filter { $0.isConfirmed }.count
-            guard confirmedCount < maxDetectedBooks else {
-                // Don't fetch more books if we've reached the limit
-                continue
-            }
-            
             // New detection - fetch details
             overlays.append((rect: detection.boundingBox, hasBook: false))
             print("🔍 [ViewModel] Fetching book details for detection: \(detection.id)")
