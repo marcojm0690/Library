@@ -226,7 +226,7 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
                 PageCount = book.PageCount,
                 CoverImageUrl = book.CoverImageUrl,
                 Description = book.Description,
-                Source = book.Source,
+                Source = book.Source ?? string.Empty,
                 ExternalId = book.ExternalId
             };
         }
@@ -244,7 +244,7 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
                 PageCount = PageCount,
                 CoverImageUrl = CoverImageUrl,
                 Description = Description,
-                Source = Source,
+                Source = string.IsNullOrEmpty(Source) ? null : Source,
                 ExternalId = ExternalId
             };
         }
