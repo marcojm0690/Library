@@ -21,6 +21,9 @@ class LibrariesListViewModel: ObservableObject {
         do {
             libraries = try await apiService.getLibrariesByOwner(userId)
             print("✅ Loaded \(libraries.count) libraries for user: \(userId)")
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // Request was cancelled (view dismissed), ignore
+            print("ℹ️ Library load cancelled")
         } catch {
             self.error = error.localizedDescription
             print("❌ Failed to load libraries: \(error)")

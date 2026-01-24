@@ -62,8 +62,15 @@ else
 }
 
 // Register external book provider services
-builder.Services.AddHttpClient<IBookProvider, OpenLibraryProvider>();
-builder.Services.AddHttpClient<IBookProvider, GoogleBooksProvider>();
+// Register each provider separately so they can all be resolved in IEnumerable<IBookProvider>
+builder.Services.AddHttpClient<OpenLibraryProvider>();
+builder.Services.AddHttpClient<GoogleBooksProvider>();
+
+// Register as IBookProvider implementations
+builder.Services.AddScoped<IBookProvider, OpenLibraryProvider>(sp => 
+    sp.GetRequiredService<OpenLibraryProvider>());
+builder.Services.AddScoped<IBookProvider, GoogleBooksProvider>(sp => 
+    sp.GetRequiredService<GoogleBooksProvider>());
 
 // Configure CORS for iOS app
 builder.Services.AddCors(options =>

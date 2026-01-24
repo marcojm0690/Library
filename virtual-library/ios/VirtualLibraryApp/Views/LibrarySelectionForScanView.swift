@@ -73,9 +73,13 @@ struct LibrarySelectionForScanView: View {
         }
         .navigationTitle("Seleccionar biblioteca")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            if let userId = authService.user?.id {
-                await viewModel.loadLibraries(for: userId)
+        .onAppear {
+            if viewModel.libraries.isEmpty {
+                Task {
+                    if let userId = authService.user?.id {
+                        await viewModel.loadLibraries(for: userId)
+                    }
+                }
             }
         }
     }

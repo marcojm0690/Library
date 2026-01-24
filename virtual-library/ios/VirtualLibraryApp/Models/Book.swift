@@ -71,4 +71,9 @@ struct LookupByIsbnRequest: Codable {
 struct SearchByCoverRequest: Codable {
     let extractedText: String
     let imageData: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case extractedText = "ExtractedText"
+        case imageData = "ImageData"
+    }
 }

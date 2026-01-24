@@ -173,16 +173,24 @@ class BookApiService: ObservableObject {
         let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner
         let url = URL(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)")!
         
-        let (data, response) = try await URLSession.shared.data(from: url)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.invalidResponse
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw APIError.invalidResponse
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode([Library].self, from: data)
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // Request was cancelled, just rethrow without logging error
+            throw urlError
+        } catch {
+            print("❌ Error loading libraries: \(error)")
+            throw error
         }
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([Library].self, from: data)
     }
     
     /// Add books to a library
