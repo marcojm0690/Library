@@ -100,6 +100,20 @@ struct MultiBookScanView: View {
                 Text(error)
             }
         }
+        .overlay(
+            VStack {
+                Spacer()
+                if viewModel.detectedBooks.isEmpty && !viewModel.isProcessing {
+                    Text("Apunta la cámara a las portadas de libros")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(10)
+                        .padding(.bottom, 100)
+                }
+            }
+        )
     }
 }
 

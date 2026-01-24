@@ -46,14 +46,14 @@ struct DetectedBookCard: View {
                 }
                 
                 HStack {
-                    Button("Dismiss") {
+                    Button("Descartar") {
                         onDismiss()
                     }
                     .buttonStyle(.bordered)
                     
                     Spacer()
                     
-                    Button("Add to Library") {
+                    Button("Agregar a Biblioteca") {
                         onAdd()
                     }
                     .buttonStyle(.borderedProminent)
@@ -61,7 +61,7 @@ struct DetectedBookCard: View {
             } else {
                 // Only text detected, no book details yet
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Detected Text:")
+                    Text("Texto detectado:")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -75,12 +75,16 @@ struct DetectedBookCard: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Text("Searching for book details...")
+                    Text("Buscando detalles del libro...")
                         .font(.caption)
                         .foregroundColor(.blue)
+                        .padding(.vertical, 4)
+                    
+                    ProgressView()
+                        .scaleEffect(0.8)
                 }
                 
-                Button("Dismiss") {
+                Button("Descartar") {
                     onDismiss()
                 }
                 .buttonStyle(.bordered)

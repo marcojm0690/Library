@@ -89,7 +89,7 @@ class MultiBookScanViewModel: ObservableObject {
         }
         
         guard let bookId = book.id else {
-            errorMessage = "Book ID not available"
+            errorMessage = "ID del libro no disponible"
             return
         }
         
@@ -98,7 +98,7 @@ class MultiBookScanViewModel: ObservableObject {
             // Remove from detected books after adding
             detectedBooks.removeAll { $0.id == detectedBook.id }
         } catch {
-            errorMessage = "Failed to add book: \(error.localizedDescription)"
+            errorMessage = "Error al agregar el libro: \(error.localizedDescription)"
         }
     }
     
