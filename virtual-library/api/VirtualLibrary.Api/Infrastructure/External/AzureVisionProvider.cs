@@ -13,13 +13,18 @@ namespace VirtualLibrary.Api.Infrastructure.External;
 public class AzureVisionProvider : IBookProvider
 {
     private readonly ImageAnalysisClient _client;
+    private readonly GoogleBooksProvider _googleBooksProvider;
     private readonly ILogger<AzureVisionProvider> _logger;
 
     public string ProviderName => "AzureVision";
 
-    public AzureVisionProvider(IConfiguration configuration, ILogger<AzureVisionProvider> logger)
+    public AzureVisionProvider(
+        IConfiguration configuration, 
+        GoogleBooksProvider googleBooksProvider,
+        ILogger<AzureVisionProvider> logger)
     {
         _logger = logger;
+        _googleBooksProvider = googleBooksProvider;
         
         var endpoint = configuration["Azure:Vision:Endpoint"]
             ?? throw new InvalidOperationException("Azure Vision endpoint not configured");
@@ -30,6 +35,7 @@ public class AzureVisionProvider : IBookProvider
 
     /// <summary>
     /// Analyzes a book cover image and returns identified book information.
+    /// Uses OCR to extract text from the cover and searches Google Books API.
     /// </summary>
     /// <param name="imageStream">Stream containing the book cover image</param>
     /// <returns>Identified book information or null if not found</returns>
@@ -37,7 +43,7 @@ public class AzureVisionProvider : IBookProvider
     {
         try
         {
-            _logger.LogInformation("Analyzing book cover image with Azure Vision");
+            _logger.LogInformation("🔍 Analyzing book cover image with Azure Vision OCR");
 
             // Reset stream position
             if (imageStream.CanSeek)
@@ -50,32 +56,57 @@ public class AzureVisionProvider : IBookProvider
             await imageStream.CopyToAsync(memoryStream);
             var imageData = BinaryData.FromBytes(memoryStream.ToArray());
 
-            // Analyze the image
+            // Analyze the image with OCR (Read feature)
             var analysisResult = await _client.AnalyzeAsync(
                 imageData,
-                VisualFeatures.Tags);
+                VisualFeatures.Read);
 
-            // Return a book entry identified from image analysis
-            return new Book
+            // Extract text from OCR results
+            var extractedText = string.Empty;
+            if (analysisResult.Value.Read?.Blocks != null)
             {
-                Id = Guid.NewGuid(),
-                Title = "Book (identified from image)",
-                Authors = new List<string> { "Unknown Author" },
-                Description = "Book identified via Azure Computer Vision image analysis",
-                CoverImageUrl = null
-            };
+                var textLines = analysisResult.Value.Read.Blocks
+                    .SelectMany(block => block.Lines)
+                    .Select(line => line.Text);
+                
+                extractedText = string.Join(" ", textLines);
+                _logger.LogInformation("📝 Extracted text from image: {Text}", extractedText);
+            }
+
+            // If we have extracted text, search Google Books
+            if (!string.IsNullOrWhiteSpace(extractedText))
+            {
+                _logger.LogInformation("🔎 Searching Google Books with extracted text...");
+                var books = await _googleBooksProvider.SearchByTextAsync(extractedText);
+                
+                if (books.Any())
+                {
+                    var firstBook = books.First();
+                    _logger.LogInformation("✅ Found book: {Title} by {Authors}", 
+                        firstBook.Title, 
+                        string.Join(", ", firstBook.Authors));
+                    
+                    // Mark the source as Vision API
+                    firstBook.Source = "Vision API + Google Books";
+                    return firstBook;
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ No books found in Google Books for extracted text");
+                }
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ No text extracted from image");
+            }
+
+            // Return null if no book found
+            return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error analyzing book cover with Azure Vision: {Message}", ex.Message);
-            // Return a generic book entry on error instead of throwing
-            return new Book
-            {
-                Id = Guid.NewGuid(),
-                Title = "Book (identified from image)",
-                Authors = new List<string> { "Unknown Author" },
-                Description = "Book identified via Azure Computer Vision"
-            };
+            _logger.LogError(ex, "❌ Error analyzing book cover with Azure Vision: {Message}", ex.Message);
+            return null;
         }
     }
 
