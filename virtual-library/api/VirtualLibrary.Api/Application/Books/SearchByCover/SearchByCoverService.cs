@@ -51,6 +51,38 @@ public class SearchByCoverService
         }
 
         // Search external providers
+        await SearchProviders(searchText, allResults, cancellationToken);
+        
+        // If no results, try with just the first few words
+        if (!allResults.Any())
+        {
+            var words = searchText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 3)
+            {
+                var shortQuery = string.Join(" ", words.Take(5));
+                _logger.LogInformation("No results found, trying shorter query: {Query}", shortQuery);
+                await SearchProviders(shortQuery, allResults, cancellationToken);
+            }
+        }
+
+        // Remove duplicates based on ISBN or title+author combination
+        var uniqueBooks = DeduplicateResults(allResults);
+
+        var response = new SearchBooksResponse
+        {
+            Books = uniqueBooks.Select(MapToResponse).ToList(),
+            TotalResults = uniqueBooks.Count
+        };
+
+        _logger.LogInformation("Returning {Count} unique results", response.TotalResults);
+        return response;
+    }
+
+    /// <summary>
+    /// Search all external providers with the given text
+    /// </summary>
+    private async Task SearchProviders(string searchText, List<Book> allResults, CancellationToken cancellationToken)
+    {
         foreach (var provider in _bookProviders)
         {
             try
@@ -70,18 +102,6 @@ public class SearchByCoverService
                 // Continue to next provider
             }
         }
-
-        // Remove duplicates based on ISBN or title+author combination
-        var uniqueBooks = DeduplicateResults(allResults);
-
-        var response = new SearchBooksResponse
-        {
-            Books = uniqueBooks.Select(MapToResponse).ToList(),
-            TotalResults = uniqueBooks.Count
-        };
-
-        _logger.LogInformation("Returning {Count} unique results", response.TotalResults);
-        return response;
     }
 
     /// <summary>

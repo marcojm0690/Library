@@ -28,10 +28,19 @@ class MultiBookDetectionService {
             print("📖 Processing rectangle \(index + 1)/\(rectangles.count)")
             
             if let text = await extractText(from: pixelBuffer, in: rectangle) {
-                print("✍️ Extracted text (\(text.count) chars): \(text.prefix(100))...")
+                // Clean and normalize extracted text
+                let cleanedText = cleanExtractedText(text)
+                print("✍️ Original text (\(text.count) chars): \(text.prefix(100))...")
+                print("🧹 Cleaned text (\(cleanedText.count) chars): \(cleanedText)")
+                
+                // Only use if we have meaningful text
+                guard !cleanedText.isEmpty, cleanedText.count >= 5 else {
+                    print("⚠️ Skipping - text too short or empty after cleaning")
+                    continue
+                }
                 
                 let detectedBook = DetectedBook(
-                    detectedText: text,
+                    detectedText: cleanedText,
                     isbn: nil,
                     boundingBox: rectangle
                 )
@@ -41,6 +50,27 @@ class MultiBookDetectionService {
         
         print("✅ Detection complete: \(detectedBooks.count) books with text detected")
         return detectedBooks
+    }
+    
+    /// Clean and normalize OCR text for better API matching
+    private func cleanExtractedText(_ text: String) -> String {
+        // Remove excessive whitespace and normalize
+        var cleaned = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        
+        // Remove common OCR noise characters
+        cleaned = cleaned.replacingOccurrences(of: "|", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "_", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "~", with: "")
+        
+        // Limit to reasonable length (first 200 chars)
+        if cleaned.count > 200 {
+            cleaned = String(cleaned.prefix(200))
+        }
+        
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     /// Detect rectangular shapes (potential books) in the frame
