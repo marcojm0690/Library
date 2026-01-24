@@ -94,22 +94,31 @@ public class SearchByCoverService
         // Split into words
         var words = text.Split(new[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
         
-        // Common publisher/edition words to filter out
+        // Only filter out obvious publisher/edition metadata words
+        // Keep most words including articles and prepositions as they provide context
         var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "edición", "edition", "editorial", "editora", "press", "publishing",
-            "publisher", "books", "library", "de", "by", "the", "a", "an", "del"
+            "publisher", "books", "library", "inc", "ltd", "llc", "copyright"
         };
         
-        // Take meaningful words (typically title and author are first/longest)
+        // Take meaningful words - increased limit for better matching
         var meaningfulWords = words
-            .Where(w => w.Length > 2 && !stopWords.Contains(w))
-            .Take(8) // Take first 8 meaningful words
+            .Where(w => w.Length > 1 && !stopWords.Contains(w))
+            .Take(15) // Increased from 8 to 15 to keep more context
             .ToList();
         
         var cleanText = string.Join(" ", meaningfulWords);
         
         _logger.LogInformation("Cleaned search text: {CleanText}", cleanText);
+        
+        // If cleaning removed too much, use original text
+        if (meaningfulWords.Count < 3)
+        {
+            _logger.LogWarning("Cleaning removed too many words, using original text");
+            return text;
+        }
+        
         return cleanText;
     }
 
