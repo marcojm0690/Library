@@ -6,13 +6,15 @@ struct DetectedBook: Identifiable, Equatable {
     let isbn: String?
     let boundingBox: CGRect
     var book: Book?
+    var isConfirmed: Bool // True when book has been successfully fetched from API
     
-    init(id: UUID = UUID(), detectedText: String, isbn: String? = nil, boundingBox: CGRect, book: Book? = nil) {
+    init(id: UUID = UUID(), detectedText: String, isbn: String? = nil, boundingBox: CGRect, book: Book? = nil, isConfirmed: Bool = false) {
         self.id = id
         self.detectedText = detectedText
         self.isbn = isbn
         self.boundingBox = boundingBox
         self.book = book
+        self.isConfirmed = isConfirmed
     }
     
     static func == (lhs: DetectedBook, rhs: DetectedBook) -> Bool {

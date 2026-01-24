@@ -63,6 +63,34 @@ struct MultiBookScanView: View {
                 
                 Spacer()
                 
+                // Color legend
+                if viewModel.rectangleOverlays.isEmpty {
+                    HStack(spacing: 20) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 12, height: 12)
+                            Text("Buscando")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                        }
+                        
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 12, height: 12)
+                            Text("Encontrado")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.6))
+                    .cornerRadius(20)
+                    .padding(.bottom, 8)
+                }
+                
                 // Detected books
                 ScrollView {
                     VStack(spacing: 12) {

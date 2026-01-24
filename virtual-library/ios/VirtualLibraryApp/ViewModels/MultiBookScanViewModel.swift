@@ -50,25 +50,43 @@ class MultiBookScanViewModel: ObservableObject {
         
         // Update rectangles with their status
         var overlays: [(rect: CGRect, hasBook: Bool)] = []
-        var updatedBooks: [DetectedBook] = []
+        var updatedBooks = detectedBooks // Start with existing books
         
         for detection in newDetections {
-            // Check if we already have this book (by text similarity)
+            // Check if we already have this rectangle confirmed (by text similarity)
             if let existingBook = detectedBooks.first(where: { 
-                similarity(between: $0.detectedText, and: detection.detectedText) > 0.7 
+                $0.isConfirmed && similarity(between: $0.detectedText, and: detection.detectedText) > 0.7 
             }) {
-                updatedBooks.append(existingBook)
-                overlays.append((rect: detection.boundingBox, hasBook: existingBook.book != nil))
-            } else {
-                // Fetch details for new detection
-                if let book = await detectionService.fetchBookDetails(for: detection) {
-                    var updatedDetection = detection
-                    updatedDetection.book = book
-                    updatedBooks.append(updatedDetection)
-                    overlays.append((rect: detection.boundingBox, hasBook: true))
-                } else {
-                    updatedBooks.append(detection)
-                    overlays.append((rect: detection.boundingBox, hasBook: false))
+                // Already confirmed - keep showing green rectangle and don't re-fetch
+                overlays.append((rect: detection.boundingBox, hasBook: true))
+                continue
+            }
+            
+            // Check if we're already fetching this detection
+            if let existingUnconfirmed = detectedBooks.first(where: {
+                !$0.isConfirmed && similarity(between: $0.detectedText, and: detection.detectedText) > 0.7
+            }) {
+                // Already processing - show red while waiting
+                overlays.append((rect: detection.boundingBox, hasBook: false))
+                continue
+            }
+            
+            // New detection - fetch details
+            overlays.append((rect: detection.boundingBox, hasBook: false))
+            let books = await detectionService.fetchBookDetails(for: detection)
+            
+            if !books.isEmpty {
+                // Create a DetectedBook for each result
+                for book in books {
+                    var confirmedDetection = detection
+                    confirmedDetection.book = book
+                    confirmedDetection.isConfirmed = true
+                    updatedBooks.append(confirmedDetection)
+                }
+                
+                // Update overlay to green for this rectangle
+                if let index = overlays.firstIndex(where: { $0.rect == detection.boundingBox }) {
+                    overlays[index] = (rect: detection.boundingBox, hasBook: true)
                 }
             }
         }

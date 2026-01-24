@@ -142,7 +142,8 @@ class MultiBookDetectionService {
     }
     
     /// Fetch book details from API using the full extracted text
-    func fetchBookDetails(for detectedBook: DetectedBook) async -> Book? {
+    /// Returns array of books that match the detected text
+    func fetchBookDetails(for detectedBook: DetectedBook) async -> [Book] {
         print("📡 fetchBookDetails called for detection: \(detectedBook.id)")
         print("   Full text: '\(detectedBook.detectedText)'")
         print("   Text length: \(detectedBook.detectedText.count) chars")
@@ -152,7 +153,7 @@ class MultiBookDetectionService {
         
         guard !searchText.isEmpty else {
             print("⚠️ No text available for search")
-            return nil
+            return []
         }
         
         print("🔍 Searching by full OCR text...")
@@ -161,18 +162,11 @@ class MultiBookDetectionService {
         do {
             let books = try await apiService.searchByCover(searchText)
             print("📊 API returned \(books.count) books")
-            
-            if let book = books.first {
-                print("✅ Using first result: \(book.title)")
-                return book
-            } else {
-                print("⚠️ No books found in search results")
-                return nil
-            }
+            return books
         } catch {
             print("❌ Search API error: \(error)")
             print("   Full error: \(String(describing: error))")
-            return nil
+            return []
         }
     }
 }
