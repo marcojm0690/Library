@@ -121,7 +121,7 @@ class BookApiService: ObservableObject {
             print("📥 Response Status: \(httpResponse.statusCode)")
             
             if let responseString = String(data: data, encoding: .utf8) {
-                print("📥 Response Body: \(responseString)")
+                print("📥 Response Body (first 500 chars): \(responseString.prefix(500))")
             }
             
             guard (200...299).contains(httpResponse.statusCode) else {
@@ -130,7 +130,20 @@ class BookApiService: ObservableObject {
             
             let searchResponse = try JSONDecoder().decode(SearchBooksResponse.self, from: data)
             print("✅ Found \(searchResponse.books.count) books")
-            return searchResponse.books.map { $0.toBook() }
+            
+            for (index, bookResponse) in searchResponse.books.enumerated() {
+                print("  📖 Book \(index + 1):")
+                print("     Title: \(bookResponse.title)")
+                print("     Authors: \(bookResponse.authors.joined(separator: ", "))")
+                print("     ID: \(bookResponse.id?.uuidString ?? "nil")")
+                print("     ISBN: \(bookResponse.isbn ?? "nil")")
+                print("     Cover: \(bookResponse.coverImageUrl ?? "nil")")
+                print("     Source: \(bookResponse.source ?? "nil")")
+            }
+            
+            let books = searchResponse.books.map { $0.toBook() }
+            print("✅ Converted to \(books.count) Book objects")
+            return books
             
         } catch let error as APIError {
             print("❌ API Error: \(error.localizedDescription)")

@@ -14,10 +14,16 @@ class MultiBookScanViewModel: ObservableObject {
     private let processingInterval: TimeInterval = 2.0 // Process every 2 seconds
     private let maxDetectedBooks = 3 // Limit to reduce API calls
     private var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
+    private var scanMode: ScanMode = .imageBased
     
     init(apiService: BookApiService) {
         self.detectionService = MultiBookDetectionService(apiService: apiService)
         setupCamera()
+    }
+    
+    func setScanMode(_ mode: ScanMode) {
+        scanMode = mode
+        detectionService.setScanMode(mode)
     }
     
     private func setupCamera() {
@@ -88,20 +94,34 @@ class MultiBookScanViewModel: ObservableObject {
             
             // New detection - fetch details
             overlays.append((rect: detection.boundingBox, hasBook: false))
+            print("🔍 [ViewModel] Fetching book details for detection: \(detection.id)")
+            print("   Detection text: '\(detection.detectedText)'")
+            print("   Has cover image: \(detection.coverImage != nil)")
+            
             let books = await detectionService.fetchBookDetails(for: detection)
             
+            print("📚 [ViewModel] Received \(books.count) books from API")
             if !books.isEmpty {
-                // Only take the first (best match) book to avoid cluttering UI
                 let bestMatch = books.first!
+                print("✅ [ViewModel] Best match: '\(bestMatch.title)' by \(bestMatch.authors.joined(separator: ", "))")
+                print("   Book details - ID: \(bestMatch.id?.uuidString ?? "nil"), ISBN: \(bestMatch.isbn ?? "nil")")
+                print("   Cover URL: \(bestMatch.coverImageUrl ?? "nil")")
+                print("   Source: \(bestMatch.source ?? "nil")")
+                
+                // Only take the first (best match) book to avoid cluttering UI
                 var confirmedDetection = detection
                 confirmedDetection.book = bestMatch
                 confirmedDetection.isConfirmed = true
                 updatedBooks.append(confirmedDetection)
                 
+                print("✅ [ViewModel] Added confirmed detection with book to list")
+                
                 // Update overlay to green for this rectangle
                 if let index = overlays.firstIndex(where: { $0.rect == detection.boundingBox }) {
                     overlays[index] = (rect: detection.boundingBox, hasBook: true)
                 }
+            } else {
+                print("⚠️ [ViewModel] No books found for this detection")
             }
         }
         

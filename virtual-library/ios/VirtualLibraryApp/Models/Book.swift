@@ -39,6 +39,19 @@ struct BookResponse: Codable {
     let pageCount: Int?
     let source: String?
     
+    enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case isbn = "isbn"
+        case title = "title"
+        case authors = "authors"
+        case publisher = "publisher"
+        case publishYear = "publishYear"
+        case coverImageUrl = "coverImageUrl"
+        case description = "description"
+        case pageCount = "pageCount"
+        case source = "source"
+    }
+    
     /// Convert to Book model
     func toBook() -> Book {
         Book(
@@ -60,6 +73,11 @@ struct BookResponse: Codable {
 struct SearchBooksResponse: Codable {
     let books: [BookResponse]
     let totalResults: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case books = "books"
+        case totalResults = "totalResults"
+    }
 }
 
 /// Request model for ISBN lookup
