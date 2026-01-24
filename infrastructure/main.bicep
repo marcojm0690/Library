@@ -133,8 +133,8 @@ resource cosmosCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabase
   }
 }
 
-// Create Azure Cache for Redis
-resource redis 'Microsoft.Cache/redis@2023-08-01' = {
+// Create Azure Cache for Redis (using latest API version)
+resource redis 'Microsoft.Cache/redis@2024-11-01' = {
   name: redisName
   location: location
   properties: {
@@ -146,9 +146,12 @@ resource redis 'Microsoft.Cache/redis@2023-08-01' = {
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
     publicNetworkAccess: 'Enabled'
+    disableAccessKeyAuthentication: false
     redisConfiguration: {
       'maxmemory-policy': 'allkeys-lru'
+      'maxmemory-reserved': '30'
     }
+    redisVersion: 'latest'
   }
 }
 
