@@ -1,7 +1,7 @@
 import Foundation
 
 /// Library model matching the API structure
-struct Library: Identifiable, Codable, Equatable {
+struct LibraryModel: Identifiable, Codable, Equatable {
     let id: UUID
     let name: String
     let description: String?

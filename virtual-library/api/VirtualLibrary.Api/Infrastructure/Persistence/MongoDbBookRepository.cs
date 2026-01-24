@@ -136,6 +136,31 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
         }
     }
 
+    public async Task<Book> UpdateAsync(Book book, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var mongoBook = MongoBook.FromBook(book);
+            
+            var filter = Builders<MongoBook>.Filter.Eq(b => b.Id, book.Id);
+            var result = await _collection.ReplaceOneAsync(filter, mongoBook, cancellationToken: cancellationToken);
+            
+            if (result.MatchedCount == 0)
+            {
+                _logger.LogWarning("Book not found for update: {BookId}", book.Id);
+                throw new InvalidOperationException($"Book with ID {book.Id} not found");
+            }
+            
+            _logger.LogInformation("Book updated successfully: {BookId}", book.Id);
+            return book;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating book: {BookId}", book.Id);
+            throw;
+        }
+    }
+
     public async Task<List<Book>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         try

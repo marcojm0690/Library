@@ -14,15 +14,18 @@ namespace VirtualLibrary.Api.Controllers;
 public class LibrariesController : ControllerBase
 {
     private readonly ILibraryRepository _libraryRepository;
+    private readonly IBookRepository _bookRepository;
     private readonly RedisCacheService _cache;
     private readonly ILogger<LibrariesController> _logger;
 
     public LibrariesController(
         ILibraryRepository libraryRepository,
+        IBookRepository bookRepository,
         RedisCacheService cache,
         ILogger<LibrariesController> logger)
     {
         _libraryRepository = libraryRepository;
+        _bookRepository = bookRepository;
         _cache = cache;
         _logger = logger;
     }
@@ -216,12 +219,15 @@ public class LibrariesController : ControllerBase
     }
 
     /// <summary>
-    /// Get books in a library
+    /// Get books in a library with enriched data from external APIs
     /// </summary>
     [HttpGet("{id:guid}/books")]
     [ProducesResponseType(typeof(IEnumerable<BookResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IEnumerable<BookResponse>>> GetLibraryBooks(Guid id, [FromServices] IBookRepository bookRepository)
+    public async Task<ActionResult<IEnumerable<BookResponse>>> GetLibraryBooks(
+        Guid id, 
+        [FromServices] IBookRepository bookRepository,
+        [FromServices] IEnumerable<IBookProvider> bookProviders)
     {
         var library = await _libraryRepository.GetByIdAsync(id);
         
@@ -236,23 +242,82 @@ public class LibrariesController : ControllerBase
             var book = await bookRepository.GetByIdAsync(bookId);
             if (book != null)
             {
+                // Try to enrich book data from external APIs if missing critical info
+                var enrichedBook = await EnrichBookDataAsync(book, bookProviders);
+                
                 books.Add(new BookResponse
                 {
-                    Id = book.Id,
-                    Title = book.Title,
-                    Authors = book.Authors,
-                    Description = book.Description,
-                    Isbn = book.Isbn,
-                    Publisher = book.Publisher,
-                    PublishYear = book.PublishYear,
-                    PageCount = book.PageCount,
-                    CoverImageUrl = book.CoverImageUrl,
-                    Source = book.Source
+                    Id = enrichedBook.Id,
+                    Title = enrichedBook.Title,
+                    Authors = enrichedBook.Authors,
+                    Description = enrichedBook.Description,
+                    Isbn = enrichedBook.Isbn,
+                    Publisher = enrichedBook.Publisher,
+                    PublishYear = enrichedBook.PublishYear,
+                    PageCount = enrichedBook.PageCount,
+                    CoverImageUrl = enrichedBook.CoverImageUrl,
+                    Source = enrichedBook.Source
                 });
             }
         }
 
         return Ok(books);
+    }
+
+    /// <summary>
+    /// Enriches book data by fetching from external APIs if data is missing
+    /// </summary>
+    private async Task<Book> EnrichBookDataAsync(Book book, IEnumerable<IBookProvider> bookProviders)
+    {
+        // If book already has complete data (cover, description, etc.), return as-is
+        if (!string.IsNullOrEmpty(book.CoverImageUrl) && 
+            !string.IsNullOrEmpty(book.Description) &&
+            book.PageCount.HasValue)
+        {
+            return book;
+        }
+
+        // If we have an ISBN, try to fetch complete data
+        if (!string.IsNullOrEmpty(book.Isbn))
+        {
+            _logger.LogInformation("Enriching book data for: {Title} (ISBN: {Isbn})", book.Title, book.Isbn);
+            
+            foreach (var provider in bookProviders)
+            {
+                try
+                {
+                    var enrichedBook = await provider.SearchByIsbnAsync(book.Isbn);
+                    if (enrichedBook != null)
+                    {
+                        // Merge data - keep existing data, only fill in missing fields
+                        book.CoverImageUrl ??= enrichedBook.CoverImageUrl;
+                        book.Description ??= enrichedBook.Description;
+                        book.Publisher ??= enrichedBook.Publisher;
+                        book.PublishYear ??= enrichedBook.PublishYear;
+                        book.PageCount ??= enrichedBook.PageCount;
+                        book.ExternalId ??= enrichedBook.ExternalId;
+                        book.Source ??= enrichedBook.Source;
+                        
+                        if (book.Authors.Count == 0 && enrichedBook.Authors.Count > 0)
+                        {
+                            book.Authors = enrichedBook.Authors;
+                        }
+                        
+                        _logger.LogInformation("Successfully enriched book data from {Provider}", provider.ProviderName);
+                        
+                        // Update the book in the database with enriched data
+                        await _bookRepository.UpdateAsync(book);
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to enrich book data from {Provider}", provider.ProviderName);
+                }
+            }
+        }
+
+        return book;
     }
 
     /// <summary>

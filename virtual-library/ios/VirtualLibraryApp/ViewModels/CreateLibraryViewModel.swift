@@ -11,7 +11,7 @@ class CreateLibraryViewModel: ObservableObject {
     
     @Published var isCreating = false
     @Published var error: String?
-    @Published var createdLibrary: Library?
+    @Published var createdLibrary: LibraryModel?
     
     private let apiService: BookApiService
     private let userId: String

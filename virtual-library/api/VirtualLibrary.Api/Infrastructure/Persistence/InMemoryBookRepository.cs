@@ -60,6 +60,20 @@ public class InMemoryBookRepository : IBookRepository
         }
     }
 
+    public Task<Book> UpdateAsync(Book book, CancellationToken cancellationToken = default)
+    {
+        lock (_lock)
+        {
+            if (!_books.ContainsKey(book.Id))
+            {
+                throw new InvalidOperationException($"Book with ID {book.Id} not found");
+            }
+
+            _books[book.Id] = book;
+            return Task.FromResult(book);
+        }
+    }
+
     public Task<List<Book>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         lock (_lock)

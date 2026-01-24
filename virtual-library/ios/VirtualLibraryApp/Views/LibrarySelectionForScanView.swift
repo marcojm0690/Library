@@ -2,28 +2,14 @@ import SwiftUI
 
 struct LibrarySelectionForScanView: View {
     @EnvironmentObject var authService: AuthenticationService
-    @StateObject private var viewModel = LibrariesListViewModel()
+    @ObservedObject private var viewModel = LibrariesListViewModel()
     
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.libraries.isEmpty {
                 ProgressView("Cargando bibliotecas...")
             } else if let error = viewModel.error {
-                VStack(spacing: 20) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 60))
-                        .foregroundColor(.red)
-                    
-                    Text("Error")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text(error)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                }
+                ErrorView(message: error)
             } else if viewModel.libraries.isEmpty {
                 VStack(spacing: 20) {
                     Image(systemName: "books.vertical")

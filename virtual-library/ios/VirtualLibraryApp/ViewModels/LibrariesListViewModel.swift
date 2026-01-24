@@ -3,7 +3,7 @@ import SwiftUI
 /// ViewModel for libraries list
 @MainActor
 class LibrariesListViewModel: ObservableObject {
-    @Published var libraries: [Library] = []
+    @Published var libraries: [LibraryModel] = []
     @Published var isLoading = false
     @Published var error: String?
     

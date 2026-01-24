@@ -55,6 +55,11 @@ public interface IBookRepository
     Task<Book> SaveAsync(Book book, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Update an existing book in the repository
+    /// </summary>
+    Task<Book> UpdateAsync(Book book, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get all books in the library
     /// </summary>
     Task<List<Book>> GetAllAsync(CancellationToken cancellationToken = default);

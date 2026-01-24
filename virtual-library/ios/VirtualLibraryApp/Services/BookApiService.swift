@@ -159,7 +159,7 @@ class BookApiService: ObservableObject {
     // MARK: - Library Management
     
     /// Get all libraries
-    func getAllLibraries() async throws -> [Library] {
+    func getAllLibraries() async throws -> [LibraryModel] {
         let url = URL(string: "\(baseURL)/api/libraries")!
         
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -171,11 +171,11 @@ class BookApiService: ObservableObject {
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([Library].self, from: data)
+        return try decoder.decode([LibraryModel].self, from: data)
     }
     
     /// Create a new library
-    func createLibrary(_ request: CreateLibraryRequest) async throws -> Library {
+    func createLibrary(_ request: CreateLibraryRequest) async throws -> LibraryModel {
         let url = URL(string: "\(baseURL)/api/libraries")!
         
         print("🔵 Creating library at: \(url.absoluteString)")
@@ -213,7 +213,7 @@ class BookApiService: ObservableObject {
             
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            let library = try decoder.decode(Library.self, from: data)
+            let library = try decoder.decode(LibraryModel.self, from: data)
             print("✅ Library created successfully: \(library.name)")
             return library
         } catch {
@@ -223,7 +223,7 @@ class BookApiService: ObservableObject {
     }
     
     /// Get libraries by owner
-    func getLibrariesByOwner(_ owner: String) async throws -> [Library] {
+    func getLibrariesByOwner(_ owner: String) async throws -> [LibraryModel] {
         let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner
         let url = URL(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)")!
         
@@ -251,7 +251,7 @@ class BookApiService: ObservableObject {
             
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            let libraries = try decoder.decode([Library].self, from: data)
+            let libraries = try decoder.decode([LibraryModel].self, from: data)
             print("✅ Decoded \(libraries.count) libraries")
             return libraries
         } catch let urlError as URLError where urlError.code == .cancelled {
@@ -285,6 +285,11 @@ class BookApiService: ObservableObject {
                 throw APIError.invalidResponse
             }
             
+            // Log raw response
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("🔵 [API] Raw response: \(responseString)")
+            }
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let bookResponses = try decoder.decode([BookResponse].self, from: data)
@@ -310,7 +315,11 @@ class BookApiService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let requestBody = ["bookIds": bookIds.map { $0.uuidString }]
+        // Create properly structured request matching backend expectations
+        struct AddBooksRequest: Codable {
+            let bookIds: [UUID]
+        }
+        let requestBody = AddBooksRequest(bookIds: bookIds)
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {

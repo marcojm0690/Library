@@ -2,10 +2,10 @@ import SwiftUI
 
 /// View to display books in a library
 struct LibraryDetailView: View {
-    let library: Library
+    let library: LibraryModel
     @StateObject private var viewModel: LibraryDetailViewModel
     
-    init(library: Library) {
+    init(library: LibraryModel) {
         self.library = library
         _viewModel = StateObject(wrappedValue: LibraryDetailViewModel(libraryId: library.id))
     }
@@ -54,7 +54,7 @@ struct LibraryDetailView: View {
         List {
             ForEach(viewModel.books) { book in
                 NavigationLink(destination: BookDetailView(book: book)) {
-                    BookRowView(book: book)
+                    LibraryBookRowView(book: book)
                 }
             }
         }
@@ -62,7 +62,7 @@ struct LibraryDetailView: View {
 }
 
 /// Row view for a book in the library
-struct BookRowView: View {
+struct LibraryBookRowView: View {
     let book: Book
     
     var body: some View {
@@ -123,28 +123,5 @@ struct BookRowView: View {
                 .foregroundColor(.secondary)
         }
         .padding(.vertical, 4)
-    }
-}
-
-/// Error view
-struct ErrorView: View {
-    let message: String
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 60))
-                .foregroundColor(.red)
-            
-            Text("Error")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text(message)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding()
-        }
     }
 }

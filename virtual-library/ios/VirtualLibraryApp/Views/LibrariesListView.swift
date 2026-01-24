@@ -95,7 +95,7 @@ struct LibrariesListView: View {
 
 /// Row view for a library
 struct LibraryRowView: View {
-    let library: Library
+    let library: LibraryModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
