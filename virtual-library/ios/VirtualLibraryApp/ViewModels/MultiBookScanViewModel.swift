@@ -14,16 +14,10 @@ class MultiBookScanViewModel: ObservableObject {
     private let processingInterval: TimeInterval = 2.0 // Process every 2 seconds
     private let maxDetectedBooks = 3 // Limit to reduce API calls
     private var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
-    private var scanMode: ScanMode = .imageBased
     
     init(apiService: BookApiService) {
         self.detectionService = MultiBookDetectionService(apiService: apiService)
         setupCamera()
-    }
-    
-    func setScanMode(_ mode: ScanMode) {
-        scanMode = mode
-        detectionService.setScanMode(mode)
     }
     
     private func setupCamera() {

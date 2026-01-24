@@ -19,7 +19,6 @@ public class BooksController : ControllerBase
 {
     private readonly SearchByIsbnService _searchByIsbnService;
     private readonly SearchByCoverService _searchByCoverService;
-    private readonly SearchByImageService _searchByImageService;
     private readonly AzureBlobLibraryRepository _libraryRepository;
     private readonly IBookRepository _bookRepository;
     private readonly ILogger<BooksController> _logger;
@@ -27,14 +26,12 @@ public class BooksController : ControllerBase
     public BooksController(
         SearchByIsbnService searchByIsbnService,
         SearchByCoverService searchByCoverService,
-        SearchByImageService searchByImageService,
         AzureBlobLibraryRepository libraryRepository,
         IBookRepository bookRepository,
         ILogger<BooksController> logger)
     {
         _searchByIsbnService = searchByIsbnService;
         _searchByCoverService = searchByCoverService;
-        _searchByImageService = searchByImageService;
         _libraryRepository = libraryRepository;
         _bookRepository = bookRepository;
         _logger = logger;
@@ -161,126 +158,18 @@ public class BooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SearchByCover([FromBody] SearchByCoverRequest request)
     {
-        _logger.LogInformation("Cover search request - Text length: {TextLength}, Has image: {HasImage}", 
-            request.ExtractedText?.Length ?? 0, 
-            !string.IsNullOrWhiteSpace(request.ImageData));
+        _logger.LogInformation("Cover search request - Text length: {TextLength}", 
+            request.ExtractedText?.Length ?? 0);
 
-        // If image is provided, try image-based search first (priority)
-        if (!string.IsNullOrWhiteSpace(request.ImageData))
-        {
-            try
-            {
-                _logger.LogInformation("Attempting image-based book identification...");
-                
-                // Convert Base64 to stream
-                var imageBytes = Convert.FromBase64String(request.ImageData);
-                using var imageStream = new MemoryStream(imageBytes);
-
-                var book = await _searchByImageService.IdentifyBookAsync(imageStream);
-
-                if (book != null)
-                {
-                    _logger.LogInformation("✅ Book identified from image: {Title}", book.Title);
-                    
-                    // Return single book result with image search indicator
-                    var response = new SearchBooksResponse
-                    {
-                        Books = new List<BookResponse>
-                        {
-                            new BookResponse
-                            {
-                                Id = book.Id,
-                                Title = book.Title,
-                                Authors = book.Authors,
-                                Isbn = book.Isbn,
-                                Publisher = book.Publisher,
-                                PublishYear = book.PublishYear,
-                                Description = book.Description,
-                                PageCount = book.PageCount,
-                                CoverImageUrl = book.CoverImageUrl,
-                                Source = book.Source ?? "Vision API"
-                            }
-                        },
-                        TotalResults = 1
-                    };
-                    
-                    return Ok(response);
-                }
-                else
-                {
-                    _logger.LogWarning("⚠️ Image-based identification returned no results, falling back to text search");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Error during image-based identification, falling back to text search");
-                // Continue to text-based search
-            }
-        }
-
-        // Fallback to text-based search if no image or image search failed
         if (string.IsNullOrWhiteSpace(request.ExtractedText))
         {
-            return BadRequest(new { error = "Either image data or extracted text is required" });
+            return BadRequest(new { error = "Extracted text is required" });
         }
 
-        _logger.LogInformation("Using text-based cover search");
+        _logger.LogInformation("Using text-based cover search with CoreML OCR");
         var result = await _searchByCoverService.ExecuteAsync(request.ExtractedText);
 
         return Ok(result);
-    }
-
-    /// <summary>
-    /// Identify a book from a cover image using Azure Computer Vision.
-    /// </summary>
-    /// <param name="request">Request containing Base64-encoded image data</param>
-    /// <returns>Identified book information</returns>
-    [HttpPost("identify-from-image")]
-    [ProducesResponseType(typeof(BookResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> IdentifyFromImage([FromBody] IdentifyBookByImageRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.ImageData))
-        {
-            return BadRequest(new { error = "Image data is required" });
-        }
-
-        try
-        {
-            _logger.LogInformation("Book identification request from image");
-
-            // Convert Base64 to stream
-            var imageBytes = Convert.FromBase64String(request.ImageData);
-            using var imageStream = new MemoryStream(imageBytes);
-
-            var book = await _searchByImageService.IdentifyBookAsync(imageStream);
-
-            if (book == null)
-            {
-                return BadRequest(new { error = "Could not identify book from the provided image" });
-            }
-
-            var response = new BookResponse
-            {
-                Id = book.Id,
-                Title = book.Title,
-                Authors = book.Authors,
-                Description = book.Description,
-                Source = "Azure Vision"
-            };
-
-            return Ok(response);
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { error = "Invalid Base64 image data" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error identifying book from image");
-            return StatusCode(500, new { error = "Error processing image", details = ex.Message });
-        }
     }
 
     /// <summary>

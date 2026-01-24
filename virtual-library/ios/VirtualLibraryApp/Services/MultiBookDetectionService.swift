@@ -4,20 +4,14 @@ import UIKit
 
 class MultiBookDetectionService {
     let apiService: BookApiService
-    private var scanMode: ScanMode = .imageBased
     
     init(apiService: BookApiService) {
         self.apiService = apiService
     }
     
-    func setScanMode(_ mode: ScanMode) {
-        scanMode = mode
-        print("📋 Scan mode changed to: \(mode == .imageBased ? "Image-based" : "Text-based")")
-    }
-    
-    /// Detect books using rectangle detection, then extract text from detected regions
+    /// Detect books using rectangle detection, then extract text from detected regions using CoreML OCR
     func detectBooks(in pixelBuffer: CVPixelBuffer) async -> [DetectedBook] {
-        print("🔍 Starting book detection in \(scanMode == .imageBased ? "image" : "text") mode...")
+        print("🔍 Starting book detection with CoreML OCR...")
         
         // Step 1: Detect rectangles (book shapes)
         let rectangles = await detectRectangles(in: pixelBuffer)
@@ -27,57 +21,38 @@ class MultiBookDetectionService {
             return []
         }
         
-        // Step 2: Process based on scan mode
+        // Step 2: Extract text from each rectangle using OCR
         var detectedBooks: [DetectedBook] = []
         
         for (index, rectangle) in rectangles.enumerated() {
-            print("📖 Processing rectangle \(index + 1)/\(rectangles.count) in \(scanMode == .imageBased ? "image" : "text") mode")
+            print("📖 Processing rectangle \(index + 1)/\(rectangles.count) - extracting text with OCR")
             
-            if scanMode == .imageBased {
-                // Image-based: Capture cover image and use for recognition
-                let coverImage = captureImage(from: pixelBuffer, in: rectangle)
-                
-                guard let image = coverImage else {
-                    print("⚠️ Skipping - no valid image captured")
-                    continue
-                }
-                
-                let detectedBook = DetectedBook(
-                    detectedText: "Image-based detection",
-                    isbn: nil,
-                    boundingBox: rectangle,
-                    coverImage: image
-                )
-                detectedBooks.append(detectedBook)
-                
-            } else {
-                // Text-based: Extract text using OCR
-                let text = await extractText(from: pixelBuffer, in: rectangle)
-                let cleanedText = text.map { cleanExtractedText($0) } ?? ""
-                
-                if let text = text {
-                    print("✍️ Original text (\(text.count) chars): \(text.prefix(100))...")
-                    print("🧹 Cleaned text (\(cleanedText.count) chars): \(cleanedText)")
-                }
-                
-                let hasValidText = !cleanedText.isEmpty && cleanedText.count >= 5
-                
-                guard hasValidText else {
-                    print("⚠️ Skipping - no valid text extracted")
-                    continue
-                }
-                
-                // Optionally capture image as supplementary data
-                let coverImage = captureImage(from: pixelBuffer, in: rectangle)
-                
-                let detectedBook = DetectedBook(
-                    detectedText: cleanedText,
-                    isbn: nil,
-                    boundingBox: rectangle,
-                    coverImage: coverImage
-                )
-                detectedBooks.append(detectedBook)
+            // Extract text using CoreML OCR
+            let text = await extractText(from: pixelBuffer, in: rectangle)
+            let cleanedText = text.map { cleanExtractedText($0) } ?? ""
+            
+            if let text = text {
+                print("✍️ Original text (\(text.count) chars): \(text.prefix(100))...")
+                print("🧹 Cleaned text (\(cleanedText.count) chars): \(cleanedText)")
             }
+            
+            let hasValidText = !cleanedText.isEmpty && cleanedText.count >= 5
+            
+            guard hasValidText else {
+                print("⚠️ Skipping - no valid text extracted")
+                continue
+            }
+            
+            // Optionally capture image as supplementary data
+            let coverImage = captureImage(from: pixelBuffer, in: rectangle)
+            
+            let detectedBook = DetectedBook(
+                detectedText: cleanedText,
+                isbn: nil,
+                boundingBox: rectangle,
+                coverImage: coverImage
+            )
+            detectedBooks.append(detectedBook)
         }
         
         print("✅ Detection complete: \(detectedBooks.count) books detected")

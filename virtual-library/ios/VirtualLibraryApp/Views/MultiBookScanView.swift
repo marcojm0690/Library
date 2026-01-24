@@ -4,8 +4,6 @@ import AVFoundation
 struct MultiBookScanView: View {
     @StateObject private var viewModel: MultiBookScanViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var scanMode: ScanMode = .imageBased
-    @State private var showModeSelector = false
     let libraryId: UUID
     
     init(libraryId: UUID) {
@@ -17,19 +15,10 @@ struct MultiBookScanView: View {
     var body: some View {
         cameraView
             .onAppear {
-                viewModel.setScanMode(scanMode)
                 viewModel.startScanning()
             }
             .onDisappear {
                 viewModel.stopScanning()
-            }
-            .onChange(of: scanMode) { _, newMode in
-                viewModel.setScanMode(newMode)
-            }
-            .sheet(isPresented: $showModeSelector) {
-                ModeSelectorSheet(selectedMode: $scanMode, onDismiss: { showModeSelector = false })
-                    .presentationDetents([.height(280)])
-                    .presentationDragIndicator(.visible)
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") {
@@ -92,23 +81,6 @@ struct MultiBookScanView: View {
                     .foregroundColor(.white)
                     .padding()
                     .background(Circle().fill(Color.black.opacity(0.6)))
-            }
-            
-            Spacer()
-            
-            Button(action: { showModeSelector.toggle() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: scanMode == .imageBased ? "camera.fill" : "text.viewfinder")
-                        .font(.callout)
-                    Text(scanMode == .imageBased ? "Imagen" : "Texto")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.blue.opacity(0.8))
-                .cornerRadius(20)
             }
             
             Spacer()
@@ -240,9 +212,9 @@ struct MultiBookScanView: View {
         VStack(spacing: 8) {
             if viewModel.rectangleOverlays.isEmpty {
                 VStack(spacing: 4) {
-                    Text(scanMode == .imageBased ? "Apunta la cámara a las portadas de libros" : "Apunta la cámara al texto de las portadas")
+                    Text("Apunta la cámara al texto de las portadas")
                         .font(.headline)
-                    Text(scanMode == .imageBased ? "Modo: Reconocimiento de imagen" : "Modo: Extracción de texto")
+                    Text("Extracción de texto con CoreML")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -252,7 +224,7 @@ struct MultiBookScanView: View {
                         .font(.headline)
                     Text("\(viewModel.rectangleOverlays.count) forma(s) detectada(s)")
                         .font(.caption)
-                    Text(scanMode == .imageBased ? "Procesando imágenes..." : "Extrayendo texto...")
+                    Text("Extrayendo texto...")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
