@@ -6,6 +6,7 @@ struct DetectedBookCard: View {
     let onDismiss: () -> Void
     @State private var offset: CGFloat = 0
     @State private var isSwipeComplete = false
+    @State private var isExpanded = false
     
     // Haptic feedback
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
@@ -102,57 +103,150 @@ struct DetectedBookCard: View {
         VStack(alignment: .leading, spacing: 0) {
             if let book = detectedBook.book {
                 // Book details found - compact design
-                HStack(spacing: 12) {
-                    // Cover image
-                    if let coverUrl = book.coverImageUrl, let url = URL(string: coverUrl) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            ZStack {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.2))
-                                ProgressView()
-                                    .scaleEffect(0.7)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 12) {
+                        // Cover image
+                        if let coverUrl = book.coverImageUrl, let url = URL(string: coverUrl) {
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                ZStack {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.2))
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                }
+                            }
+                            .frame(width: 50, height: 75)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                        }
+                        
+                        // Book info
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(book.title)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .lineLimit(isExpanded ? nil : 2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            
+                            if !book.authors.isEmpty {
+                                Text(book.authors.joined(separator: ", "))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                            
+                            // Show source badge
+                            if let source = book.source {
+                                HStack(spacing: 4) {
+                                    Image(systemName: source.contains("Vision") ? "eye.fill" : "text.magnifyingglass")
+                                        .font(.system(size: 8))
+                                    Text(source)
+                                        .font(.system(size: 9))
+                                }
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(4)
                             }
                         }
-                        .frame(width: 50, height: 75)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                    }
-                    
-                    // Book info
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(book.title)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
                         
-                        if !book.authors.isEmpty {
-                            Text(book.authors.joined(separator: ", "))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
+                        Spacer()
+                        
+                        // Expand/collapse button and swipe hint
+                        VStack(spacing: 4) {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3)) {
+                                    isExpanded.toggle()
+                                }
+                            }) {
+                                Image(systemName: isExpanded ? "chevron.up.circle.fill" : "info.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            // Swipe hint indicator
+                            VStack(spacing: 2) {
+                                Image(systemName: "chevron.left.2")
+                                    .font(.caption2)
+                                    .foregroundColor(.green.opacity(0.5))
+                                Image(systemName: "chevron.right.2")
+                                    .font(.caption2)
+                                    .foregroundColor(.red.opacity(0.5))
+                            }
                         }
                     }
+                    .padding(12)
                     
-                    Spacer()
-                    
-                    // Swipe hint indicator - only show for confirmed books
-                    if detectedBook.book != nil {
-                        VStack(spacing: 2) {
-                            Image(systemName: "chevron.left.2")
-                                .font(.caption2)
-                                .foregroundColor(.green.opacity(0.5))
-                            Image(systemName: "chevron.right.2")
-                                .font(.caption2)
-                                .foregroundColor(.red.opacity(0.5))
+                    // Expanded details section
+                    if isExpanded {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Divider()
+                            
+                            if let description = book.description, !description.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Descripción")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.secondary)
+                                    Text(description)
+                                        .font(.caption)
+                                        .lineLimit(4)
+                                }
+                            }
+                            
+                            HStack(spacing: 16) {
+                                if let publisher = book.publisher {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Editorial")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Text(publisher)
+                                            .font(.caption)
+                                    }
+                                }
+                                
+                                if let year = book.publishYear {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Año")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Text("\(year)")
+                                            .font(.caption)
+                                    }
+                                }
+                                
+                                if let pages = book.pageCount {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Páginas")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Text("\(pages)")
+                                            .font(.caption)
+                                    }
+                                }
+                            }
+                            
+                            if let isbn = book.isbn {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("ISBN")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text(isbn)
+                                        .font(.caption)
+                                        .fontDesign(.monospaced)
+                                }
+                            }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                     }
                 }
-                .padding(12)
             } else {
                 // Only text detected, no book details yet - compact loading state
                 HStack(spacing: 12) {

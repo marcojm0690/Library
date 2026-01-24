@@ -182,7 +182,7 @@ public class BooksController : ControllerBase
                 {
                     _logger.LogInformation("✅ Book identified from image: {Title}", book.Title);
                     
-                    // Return single book result
+                    // Return single book result with image search indicator
                     var response = new SearchBooksResponse
                     {
                         Books = new List<BookResponse>
@@ -198,7 +198,7 @@ public class BooksController : ControllerBase
                                 Description = book.Description,
                                 PageCount = book.PageCount,
                                 CoverImageUrl = book.CoverImageUrl,
-                                Source = "Image-based identification"
+                                Source = book.Source ?? "Vision API"
                             }
                         },
                         TotalResults = 1
