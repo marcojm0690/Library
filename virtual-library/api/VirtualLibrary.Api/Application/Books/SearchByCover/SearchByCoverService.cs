@@ -89,9 +89,28 @@ public class SearchByCoverService
     /// </summary>
     private string CleanExtractedText(string text)
     {
-        // Remove excessive whitespace, special characters, etc.
-        // This is a placeholder - real implementation would be more sophisticated
-        return text.Trim();
+        _logger.LogInformation("Original OCR text: {Text}", text);
+        
+        // Split into words
+        var words = text.Split(new[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        // Common publisher/edition words to filter out
+        var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "edición", "edition", "editorial", "editora", "press", "publishing",
+            "publisher", "books", "library", "de", "by", "the", "a", "an", "del"
+        };
+        
+        // Take meaningful words (typically title and author are first/longest)
+        var meaningfulWords = words
+            .Where(w => w.Length > 2 && !stopWords.Contains(w))
+            .Take(8) // Take first 8 meaningful words
+            .ToList();
+        
+        var cleanText = string.Join(" ", meaningfulWords);
+        
+        _logger.LogInformation("Cleaned search text: {CleanText}", cleanText);
+        return cleanText;
     }
 
     /// <summary>

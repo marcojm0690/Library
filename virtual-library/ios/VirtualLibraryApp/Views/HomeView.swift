@@ -57,6 +57,15 @@ struct HomeView: View {
                         )
                     }
                     
+                    // Multi-book scan requires a library to be selected
+                    NavigationLink(destination: LibrarySelectionForScanView()) {
+                        FeatureButton(
+                            icon: "viewfinder",
+                            title: "Detección múltiple",
+                            description: "Detecta varios libros a la vez"
+                        )
+                    }
+                    
                     Button(action: {
                         showCreateLibrary = true
                     }) {

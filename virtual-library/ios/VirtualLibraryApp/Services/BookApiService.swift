@@ -184,6 +184,25 @@ class BookApiService: ObservableObject {
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode([Library].self, from: data)
     }
+    
+    /// Add books to a library
+    func addBooksToLibrary(libraryId: UUID, bookIds: [UUID]) async throws {
+        let url = URL(string: "\(baseURL)/api/libraries/\(libraryId.uuidString)/books")!
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody = ["bookIds": bookIds.map { $0.uuidString }]
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+    }
 }
 
 // MARK: - API Errors
