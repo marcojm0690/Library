@@ -84,16 +84,21 @@ struct BookDetailView: View {
                     if let description = book.description, !description.isEmpty {
                         Divider()
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Descripción", systemImage: "text.alignleft")
-                                .font(.headline)
-                                .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "text.alignleft")
+                                    .foregroundColor(.blue)
+                                Text("Descripción")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                            }
                             
                             Text(description)
                                 .font(.body)
                                 .foregroundColor(.primary)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
                         }
+                        .padding(.top, 4)
                     }
                 }
                 .padding()

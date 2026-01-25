@@ -48,7 +48,19 @@ public class OpenLibraryProvider : IBookProvider
             }
 
             var bookData = result.First().Value;
-            return MapToBook(bookData);
+            var book = MapToBook(bookData);
+            
+            // Fetch description from works endpoint if available
+            if (book != null && !string.IsNullOrEmpty(bookData.Key))
+            {
+                var description = await FetchDescriptionFromWorkAsync(bookData.Key, cancellationToken);
+                if (!string.IsNullOrEmpty(description))
+                {
+                    book.Description = description;
+                }
+            }
+            
+            return book;
         }
         catch (Exception ex)
         {
@@ -138,6 +150,65 @@ public class OpenLibraryProvider : IBookProvider
         }
         return null;
     }
+
+    /// <summary>
+    /// Fetch description from OpenLibrary Works endpoint
+    /// </summary>
+    private async Task<string?> FetchDescriptionFromWorkAsync(string bookKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // The book key might be like "/books/OL123M", we need to find the work key
+            // First, get the book details to find the works
+            var bookResponse = await _httpClient.GetAsync($"{bookKey}.json", cancellationToken);
+            if (!bookResponse.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var bookContent = await bookResponse.Content.ReadAsStringAsync(cancellationToken);
+            var bookDetails = JsonSerializer.Deserialize<OpenLibraryBookDetails>(bookContent);
+
+            var workKey = bookDetails?.Works?.FirstOrDefault()?.Key;
+            if (string.IsNullOrEmpty(workKey))
+            {
+                return null;
+            }
+
+            // Now fetch the work details which contain the description
+            var workResponse = await _httpClient.GetAsync($"{workKey}.json", cancellationToken);
+            if (!workResponse.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var workContent = await workResponse.Content.ReadAsStringAsync(cancellationToken);
+            var workDetails = JsonSerializer.Deserialize<OpenLibraryWork>(workContent);
+
+            // Description can be a string or an object with "value" property
+            if (workDetails?.Description != null)
+            {
+                if (workDetails.Description.ValueKind == JsonValueKind.String)
+                {
+                    return workDetails.Description.GetString();
+                }
+                else if (workDetails.Description.ValueKind == JsonValueKind.Object)
+                {
+                    if (workDetails.Description.TryGetProperty("value", out var valueElement))
+                    {
+                        return valueElement.GetString();
+                    }
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch description for book {BookKey}", bookKey);
+            return null;
+        }
+    }
 }
 
 // Open Library API response models for book data endpoint
@@ -178,6 +249,25 @@ public class OpenLibraryAuthor
 }
 
 public class OpenLibraryPublisher
+
+// Models for fetching descriptions from Works API
+public class OpenLibraryBookDetails
+{
+    [JsonPropertyName("works")]
+    public List<OpenLibraryWorkReference>? Works { get; set; }
+}
+
+public class OpenLibraryWorkReference
+{
+    [JsonPropertyName("key")]
+    public string? Key { get; set; }
+}
+
+public class OpenLibraryWork
+{
+    [JsonPropertyName("description")]
+    public JsonElement? Description { get; set; }
+}
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
