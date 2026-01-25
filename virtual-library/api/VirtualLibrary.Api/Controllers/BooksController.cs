@@ -14,6 +14,7 @@ namespace VirtualLibrary.Api.Controllers;
 /// Provides endpoints for ISBN lookup, cover-based search, and image-based identification.
 /// </summary>
 [ApiController]
+[Route("api/[controller]")]
 public class BooksController : ControllerBase
 {
     /// <summary>
