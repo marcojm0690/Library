@@ -1,9 +1,9 @@
 import SwiftUI
-
-/// View to display books in a library
 struct LibraryDetailView: View {
     let library: LibraryModel
     @StateObject private var viewModel: LibraryDetailViewModel
+    @State private var showVoiceSearch = false
+    @State private var showAddMenu = false
     
     init(library: LibraryModel) {
         self.library = library
@@ -24,6 +24,33 @@ struct LibraryDetailView: View {
         }
         .navigationTitle(library.name)
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: { showVoiceSearch = true }) {
+                        Label("Búsqueda por voz", systemImage: "mic.circle.fill")
+                    }
+                    
+                    NavigationLink(destination: ScanIsbnView()) {
+                        Label("Escanear ISBN", systemImage: "barcode.viewfinder")
+                    }
+                    
+                    NavigationLink(destination: MultiBookScanView(libraryId: library.id)) {
+                        Label("Escanear cubiertas", systemImage: "camera.viewfinder")
+                    }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                }
+            }
+        }
+        .sheet(isPresented: $showVoiceSearch) {
+            VoiceSearchView(libraryId: library.id) {
+                Task {
+                    await viewModel.refresh()
+                }
+            }
+        }
         .task {
             await viewModel.loadBooks()
         }
@@ -42,10 +69,62 @@ struct LibraryDetailView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Agrega libros escaneándolos")
+            Text("Agrega libros usando voz, escáner o ISBN")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            
+            // Quick action buttons
+            VStack(spacing: 12) {
+                Button(action: { showVoiceSearch = true }) {
+                    HStack {
+                        Image(systemName: "mic.circle.fill")
+                        Text("Búsqueda por voz")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                }
+                
+                HStack(spacing: 12) {
+                    NavigationLink(destination: ScanIsbnView()) {
+                        HStack {
+                            Image(systemName: "barcode.viewfinder")
+                            Text("ISBN")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    
+                    NavigationLink(destination: MultiBookScanView(libraryId: library.id)) {
+                        HStack {
+                            Image(systemName: "camera.viewfinder")
+                            Text("Escanear")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(12)
+                    }
+                }
+            }
+            .padding(.horizontal, 40)
+            .padding(.top, 10)
         }
         .padding()
     }

@@ -187,9 +187,6 @@ struct MultiBookScanView: View {
                                 viewModel.rectangleOverlays.removeAll { $0.rect == detectedBook.boundingBox }
                             }
                             
-                            // Add to ignored list immediately
-                            viewModel.ignoredTexts.insert(detectedBook.detectedText)
-                            
                             // Show processing toast
                             processingMessage = "Agregando '\(detectedBook.book?.title ?? "libro")'..."
                             withAnimation {

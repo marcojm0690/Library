@@ -83,7 +83,6 @@ class MultiBookScanViewModel: ObservableObject {
         if !newDetections.isEmpty && timeSinceLastDetection > detectionPersistDuration {
             print("🧹 [ViewModel] Clearing previous detections - \(String(format: "%.1f", timeSinceLastDetection))s elapsed")
             detectedBooks.removeAll()
-            ignoredTexts.removeAll()
             lastDetectionTime = Date()
         } else if !newDetections.isEmpty && !detectedBooks.isEmpty {
             // If we have existing detections and time hasn't elapsed, keep them
@@ -116,14 +115,14 @@ class MultiBookScanViewModel: ObservableObject {
                 print("   Cover URL: \(bestMatch.coverImageUrl ?? "nil")")
                 print("   Source: \(bestMatch.source ?? "nil")")
                 
-                // Only take the first (best match) book to avoid cluttering UI
-                varCheck if book is already in current library
+                // Check if book is already in current library
                 if isBookInCurrentLibrary(bestMatch.id) {
                     print("⏭️ [ViewModel] Skipping - book already in current library")
                     continue
                 }
                 
-                //  confirmedDetection = detection
+                // Only take the first (best match) book to avoid cluttering UI
+                var confirmedDetection = detection
                 confirmedDetection.book = bestMatch
                 confirmedDetection.isConfirmed = true
                 updatedBooks.append(confirmedDetection)
@@ -209,12 +208,7 @@ class MultiBookScanViewModel: ObservableObject {
         // Reset library-specific tracking (useful when switching libraries or restarting)
         booksInCurrentLibrary.removeAll()
         currentLibraryId = nil
-        print("🔄 Cleared library book tracking
-    
-    func clearIgnoredBooks() {
-        // Reset ignored books list (useful when restarting scan session)
-        ignoredTexts.removeAll()
-        print("🔄 Cleared ignored books list")
+        print("🔄 Cleared library book tracking")
     }
     
     // MARK: - Helper Methods
