@@ -111,13 +111,19 @@ public class LibrariesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LibraryResponse>> Create([FromBody] CreateLibraryRequest request)
     {
+        _logger.LogInformation("🔵 Create library endpoint called");
+        _logger.LogInformation("🔵 Request: Name={Name}, Owner={Owner}, Tags={Tags}, IsPublic={IsPublic}", 
+            request.Name, request.Owner, request.Tags?.Count ?? 0, request.IsPublic);
+        
         if (string.IsNullOrWhiteSpace(request.Name))
         {
+            _logger.LogWarning("❌ Library name is empty");
             return BadRequest(new { message = "Library name is required" });
         }
 
         if (string.IsNullOrWhiteSpace(request.Owner))
         {
+            _logger.LogWarning("❌ Owner is empty");
             return BadRequest(new { message = "Owner is required" });
         }
 
@@ -130,7 +136,10 @@ public class LibrariesController : ControllerBase
             IsPublic = request.IsPublic
         };
 
+        _logger.LogInformation("🔵 Creating library in database...");
         var created = await _libraryRepository.CreateAsync(library);
+        _logger.LogInformation("✅ Library created with ID: {LibraryId}", created.Id);
+        
         var response = MapToResponse(created);
 
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, response);

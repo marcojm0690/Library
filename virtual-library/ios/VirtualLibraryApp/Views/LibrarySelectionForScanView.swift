@@ -3,6 +3,7 @@ import SwiftUI
 struct LibrarySelectionForScanView: View {
     @EnvironmentObject var authService: AuthenticationService
     @ObservedObject private var viewModel = LibrariesListViewModel()
+    @State private var showCreateLibrary = false
     
     var body: some View {
         Group {
@@ -25,6 +26,19 @@ struct LibrarySelectionForScanView: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding()
+                    
+                    Button(action: {
+                        showCreateLibrary = true
+                    }) {
+                        Label("Crear biblioteca", systemImage: "plus.circle.fill")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                    }
                 }
                 .padding()
             } else {
@@ -59,6 +73,25 @@ struct LibrarySelectionForScanView: View {
         }
         .navigationTitle("Seleccionar biblioteca")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showCreateLibrary = true
+                }) {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showCreateLibrary, onDismiss: {
+            // Reload libraries after creating new one
+            Task {
+                if let userId = authService.user?.id {
+                    await viewModel.refresh(for: userId)
+                }
+            }
+        }) {
+            CreateLibraryView()
+        }
         .task {
             if let userId = authService.user?.id {
                 await viewModel.loadLibraries(for: userId)
