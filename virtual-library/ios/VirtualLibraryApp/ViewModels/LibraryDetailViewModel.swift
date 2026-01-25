@@ -9,6 +9,7 @@ class LibraryDetailViewModel: ObservableObject {
     
     private let libraryId: UUID
     private let apiService: BookApiService
+    private var loadTask: Task<Void, Never>?  // Track the task to prevent cancellation
     
     init(libraryId: UUID, apiService: BookApiService = BookApiService()) {
         self.libraryId = libraryId
@@ -17,18 +18,25 @@ class LibraryDetailViewModel: ObservableObject {
     
     /// Load books in the library
     func loadBooks() async {
-        isLoading = true
-        error = nil
+        // Cancel any existing load task
+        loadTask?.cancel()
         
-        do {
-            books = try await apiService.getBooksInLibrary(libraryId: libraryId)
-            print("✅ Loaded \(books.count) books for library: \(libraryId.uuidString)")
-        } catch {
-            self.error = error.localizedDescription
-            print("❌ Failed to load books: \(error)")
+        loadTask = Task {
+            isLoading = true
+            error = nil
+            
+            do {
+                books = try await apiService.getBooksInLibrary(libraryId: libraryId)
+                print("✅ Loaded \(books.count) books for library: \(libraryId.uuidString)")
+            } catch {
+                self.error = error.localizedDescription
+                print("❌ Failed to load books: \(error)")
+            }
+            
+            isLoading = false
         }
         
-        isLoading = false
+        await loadTask?.value
     }
     
     /// Refresh books

@@ -370,8 +370,15 @@ class BookApiService: ObservableObject {
         print("🔵 [API] Getting books in library")
         print("   URL: \(url.absoluteString)")
         
+        // Create a dedicated URLSession configuration with longer timeout
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        configuration.waitsForConnectivity = true
+        let session = URLSession(configuration: configuration)
+        
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await session.data(from: url)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [API] Invalid response type")
@@ -396,6 +403,10 @@ class BookApiService: ObservableObject {
             let books = bookResponses.map { $0.toBook() }
             print("✅ [API] Loaded \(books.count) books")
             return books
+        } catch let error as URLError where error.code == .cancelled {
+            print("⚠️ [API] Request was cancelled - likely view dismissed")
+            // Return empty array instead of throwing to handle graceful dismissal
+            return []
         } catch {
             print("❌ [API] Error getting library books: \(error)")
             throw error

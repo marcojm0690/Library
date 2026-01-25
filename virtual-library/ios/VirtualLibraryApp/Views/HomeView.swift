@@ -49,19 +49,19 @@ struct HomeView: View {
                         )
                     }
                     
-                    NavigationLink(destination: ScanCoverView()) {
+                    /*NavigationLink(destination: ScanCoverView()) {
                         FeatureButton(
                             icon: "book.closed.fill",
                             title: "Escanear cubierta",
                             description: "Use OCR to identify from cover"
                         )
-                    }
+                    }*/
                     
                     // Multi-book scan requires a library to be selected
                     NavigationLink(destination: LibrarySelectionForScanView()) {
                         FeatureButton(
-                            icon: "viewfinder",
-                            title: "Detección múltiple",
+                            icon: "book.closed.fill",
+                            title: "Escanear cubierta",
                             description: "Detecta varios libros a la vez"
                         )
                     }
