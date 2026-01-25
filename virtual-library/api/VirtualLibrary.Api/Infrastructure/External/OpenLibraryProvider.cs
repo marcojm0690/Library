@@ -186,15 +186,17 @@ public class OpenLibraryProvider : IBookProvider
             var workDetails = JsonSerializer.Deserialize<OpenLibraryWork>(workContent);
 
             // Description can be a string or an object with "value" property
-            if (workDetails?.Description != null)
+            if (workDetails?.Description.HasValue == true)
             {
-                if (workDetails.Description.ValueKind == JsonValueKind.String)
+                var description = workDetails.Description.Value;
+                
+                if (description.ValueKind == JsonValueKind.String)
                 {
-                    return workDetails.Description.GetString();
+                    return description.GetString();
                 }
-                else if (workDetails.Description.ValueKind == JsonValueKind.Object)
+                else if (description.ValueKind == JsonValueKind.Object)
                 {
-                    if (workDetails.Description.TryGetProperty("value", out var valueElement))
+                    if (description.TryGetProperty("value", out var valueElement))
                     {
                         return valueElement.GetString();
                     }
@@ -249,25 +251,6 @@ public class OpenLibraryAuthor
 }
 
 public class OpenLibraryPublisher
-
-// Models for fetching descriptions from Works API
-public class OpenLibraryBookDetails
-{
-    [JsonPropertyName("works")]
-    public List<OpenLibraryWorkReference>? Works { get; set; }
-}
-
-public class OpenLibraryWorkReference
-{
-    [JsonPropertyName("key")]
-    public string? Key { get; set; }
-}
-
-public class OpenLibraryWork
-{
-    [JsonPropertyName("description")]
-    public JsonElement? Description { get; set; }
-}
 {
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
@@ -326,4 +309,23 @@ public class OpenLibraryDoc
 
     [JsonPropertyName("cover_i")]
     public int? CoverI { get; set; }
+}
+
+// Models for fetching descriptions from Works API
+public class OpenLibraryBookDetails
+{
+    [JsonPropertyName("works")]
+    public List<OpenLibraryWorkReference>? Works { get; set; }
+}
+
+public class OpenLibraryWorkReference
+{
+    [JsonPropertyName("key")]
+    public string? Key { get; set; }
+}
+
+public class OpenLibraryWork
+{
+    [JsonPropertyName("description")]
+    public JsonElement? Description { get; set; }
 }
