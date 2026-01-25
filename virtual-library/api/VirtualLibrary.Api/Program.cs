@@ -34,35 +34,48 @@ var librariesCollectionName = mongoDbConfig["LibrariesCollectionName"] ?? "Libra
 
 if (!string.IsNullOrEmpty(connectionString))
 {
-    // Use MongoDB repository for production
-    builder.Services.AddScoped<MongoDbBookRepository>(sp =>
-        new MongoDbBookRepository(
-            connectionString,
-            databaseName,
-            collectionName,
-            sp.GetRequiredService<ILogger<MongoDbBookRepository>>()));
+    try
+    {
+        // Use MongoDB repository for production
+        builder.Services.AddScoped<MongoDbBookRepository>(sp =>
+            new MongoDbBookRepository(
+                connectionString,
+                databaseName,
+                collectionName,
+                sp.GetRequiredService<ILogger<MongoDbBookRepository>>()));
 
-    builder.Services.AddScoped<IBookRepository>(sp =>
-        sp.GetRequiredService<MongoDbBookRepository>());
+        builder.Services.AddScoped<IBookRepository>(sp =>
+            sp.GetRequiredService<MongoDbBookRepository>());
 
-    // Register library repository
-    builder.Services.AddScoped<MongoDbLibraryRepository>(sp =>
-        new MongoDbLibraryRepository(
-            connectionString,
-            databaseName,
-            librariesCollectionName,
-            sp.GetRequiredService<ILogger<MongoDbLibraryRepository>>()));
+        // Register library repository
+        builder.Services.AddScoped<MongoDbLibraryRepository>(sp =>
+            new MongoDbLibraryRepository(
+                connectionString,
+                databaseName,
+                librariesCollectionName,
+                sp.GetRequiredService<ILogger<MongoDbLibraryRepository>>()));
 
-    builder.Services.AddScoped<ILibraryRepository>(sp =>
-        sp.GetRequiredService<MongoDbLibraryRepository>());
+        builder.Services.AddScoped<ILibraryRepository>(sp =>
+            sp.GetRequiredService<MongoDbLibraryRepository>());
 
-    // Register seeder for development/testing
-    builder.Services.AddScoped<MongoDbSeeder>();
+        // Register seeder for development/testing
+        builder.Services.AddScoped<MongoDbSeeder>();
+        
+        Console.WriteLine($"MongoDB repositories configured - DB: {databaseName}, Books: {collectionName}, Libraries: {librariesCollectionName}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"ERROR configuring MongoDB repositories: {ex.Message}");
+        throw;
+    }
 }
 else
 {
+    Console.WriteLine("WARNING: MongoDB connection string not configured. Using in-memory repository.");
     // Fallback to in-memory repository if MongoDB not configured
     builder.Services.AddSingleton<IBookRepository, InMemoryBookRepository>();
+    // TODO: Create InMemoryLibraryRepository or throw error
+    throw new InvalidOperationException("MongoDB connection string is required for library management");
 }
 
 // Register external book provider services
