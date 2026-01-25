@@ -419,6 +419,55 @@ class BookApiService: ObservableObject {
         }
     }
     
+    /// Remove books from a library
+    func removeBooksFromLibrary(libraryId: UUID, bookIds: [UUID]) async throws {
+        let url = URL(string: "\(baseURL)/api/libraries/\(libraryId.uuidString)/books")!
+        
+        print("🔵 [API] Removing books from library")
+        print("   URL: \(url.absoluteString)")
+        print("   Library ID: \(libraryId.uuidString)")
+        print("   Book IDs: \(bookIds.map { $0.uuidString })")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        struct RemoveBooksRequest: Codable {
+            let bookIds: [UUID]
+        }
+        let requestBody = RemoveBooksRequest(bookIds: bookIds)
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("   Request body: \(bodyString)")
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [API] Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 [API] Remove response status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8), !responseString.isEmpty {
+                print("🔵 [API] Response body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ [API] HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            print("✅ [API] Books removed successfully")
+        } catch {
+            print("❌ [API] Error removing books: \(error)")
+            throw error
+        }
+    }
+    
     // MARK: - Helper Methods
     
     /// Resize image to fit within max dimension while maintaining aspect ratio

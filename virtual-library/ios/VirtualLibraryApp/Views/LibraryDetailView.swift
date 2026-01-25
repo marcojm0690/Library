@@ -53,8 +53,21 @@ struct LibraryDetailView: View {
     var booksList: some View {
         List {
             ForEach(viewModel.books) { book in
-                NavigationLink(destination: BookDetailView(book: book)) {
+                NavigationLink(destination: BookDetailView(book: book, library: library)) {
                     LibraryBookRowView(book: book)
+                }
+            }
+            .onDelete { indexSet in
+                Task {
+                    for index in indexSet {
+                        let book = viewModel.books[index]
+                        guard let bookId = book.id else { continue }
+                        do {
+                            try await viewModel.removeBook(bookId: bookId)
+                        } catch {
+                            print("❌ Failed to remove book: \(error)")
+                        }
+                    }
                 }
             }
         }

@@ -35,4 +35,17 @@ class LibraryDetailViewModel: ObservableObject {
     func refresh() async {
         await loadBooks()
     }
+    
+    /// Remove a book from the library
+    func removeBook(bookId: UUID) async throws {
+        do {
+            try await apiService.removeBooksFromLibrary(libraryId: libraryId, bookIds: [bookId])
+            // Remove from local array on success
+            books.removeAll { $0.id == bookId }
+            print("✅ Removed book \(bookId.uuidString) from library \(libraryId.uuidString)")
+        } catch {
+            print("❌ Failed to remove book: \(error)")
+            throw error
+        }
+    }
 }

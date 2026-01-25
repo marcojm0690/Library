@@ -3,6 +3,15 @@ import SwiftUI
 /// View to display full book details
 struct BookDetailView: View {
     let book: Book
+    let library: LibraryModel?
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingDeleteAlert = false
+    @State private var isDeleting = false
+    
+    init(book: Book, library: LibraryModel? = nil) {
+        self.book = book
+        self.library = library
+    }
     
     var body: some View {
         ScrollView {
@@ -107,6 +116,49 @@ struct BookDetailView: View {
         }
         .navigationTitle("Detalle del libro")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if library != nil {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingDeleteAlert = true
+                    } label: {
+                        if isDeleting {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .disabled(isDeleting)
+                }
+            }
+        }
+        .alert("Eliminar libro", isPresented: $showingDeleteAlert) {
+            Button("Cancelar", role: .cancel) { }
+            Button("Eliminar", role: .destructive) {
+                Task {
+                    await removeBookFromLibrary()
+                }
+            }
+        } message: {
+            Text("¿Estás seguro de que deseas eliminar este libro de la biblioteca?")
+        }
+    }
+    
+    private func removeBookFromLibrary() async {
+        guard let library = library, let bookId = book.id else { return }
+        
+        isDeleting = true
+        
+        do {
+            let apiService = BookApiService()
+            try await apiService.removeBooksFromLibrary(libraryId: library.id, bookIds: [bookId])
+            dismiss()
+        } catch {
+            print("❌ Failed to remove book: \(error)")
+        }
+        
+        isDeleting = false
     }
 }
 

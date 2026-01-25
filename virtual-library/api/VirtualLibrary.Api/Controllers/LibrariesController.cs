@@ -318,9 +318,10 @@ public class LibrariesController : ControllerBase
     /// </summary>
     private async Task<Book> EnrichBookDataAsync(Book book, IEnumerable<IBookProvider> bookProviders)
     {
-        // If book already has complete data (cover, description, etc.), return as-is
+        // If book already has complete data (cover, description, ISBN, etc.), return as-is
         if (!string.IsNullOrEmpty(book.CoverImageUrl) && 
             !string.IsNullOrEmpty(book.Description) &&
+            !string.IsNullOrEmpty(book.Isbn) &&
             book.PageCount.HasValue)
         {
             return book;
@@ -374,6 +375,63 @@ public class LibrariesController : ControllerBase
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to enrich book data from {Provider}", provider.ProviderName);
+                }
+            }
+        }
+        else
+        {
+            // No ISBN - try to find it by searching for title + author
+            _logger.LogInformation("Book has no ISBN, searching by title: {Title}", book.Title);
+            
+            var searchText = book.Title;
+            if (book.Authors.Count > 0)
+            {
+                searchText += " " + book.Authors[0];
+            }
+            
+            foreach (var provider in bookProviders)
+            {
+                try
+                {
+                    var searchResults = await provider.SearchByTextAsync(searchText);
+                    if (searchResults != null && searchResults.Count > 0)
+                    {
+                        // Take the first result that has an ISBN
+                        var enrichedBook = searchResults.FirstOrDefault(b => !string.IsNullOrEmpty(b.Isbn));
+                        if (enrichedBook != null)
+                        {
+                            _logger.LogInformation("Found ISBN {Isbn} for book {Title} from {Provider}", 
+                                enrichedBook.Isbn, book.Title, provider.ProviderName);
+                            
+                            // Merge data from the found book
+                            book.Isbn ??= enrichedBook.Isbn;
+                            book.Description ??= enrichedBook.Description;
+                            book.Publisher ??= enrichedBook.Publisher;
+                            book.PublishYear ??= enrichedBook.PublishYear;
+                            book.PageCount ??= enrichedBook.PageCount;
+                            book.ExternalId ??= enrichedBook.ExternalId;
+                            book.Source ??= enrichedBook.Source;
+                            
+                            if (string.IsNullOrEmpty(book.CoverImageUrl) && !string.IsNullOrEmpty(enrichedBook.CoverImageUrl))
+                            {
+                                book.CoverImageUrl = enrichedBook.CoverImageUrl;
+                            }
+                            
+                            if (book.Authors.Count == 0 && enrichedBook.Authors.Count > 0)
+                            {
+                                book.Authors = enrichedBook.Authors;
+                            }
+                            
+                            // Update the book in database with ISBN and other enriched data
+                            await _bookRepository.UpdateAsync(book);
+                            
+                            break; // Found what we need, stop searching
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to search for book by text from {Provider}", provider.ProviderName);
                 }
             }
         }
