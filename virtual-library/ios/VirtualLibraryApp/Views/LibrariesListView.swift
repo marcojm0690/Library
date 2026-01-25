@@ -89,6 +89,18 @@ struct LibrariesListView: View {
                     LibraryRowView(library: library)
                 }
             }
+            .onDelete { indexSet in
+                Task {
+                    for index in indexSet {
+                        let library = viewModel.libraries[index]
+                        do {
+                            try await viewModel.deleteLibrary(library)
+                        } catch {
+                            print("❌ Failed to delete library: \(error)")
+                        }
+                    }
+                }
+            }
         }
     }
 }

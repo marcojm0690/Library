@@ -36,4 +36,17 @@ class LibrariesListViewModel: ObservableObject {
     func refresh(for userId: String) async {
         await loadLibraries(for: userId)
     }
+    
+    /// Delete a library
+    func deleteLibrary(_ library: LibraryModel) async throws {
+        do {
+            try await apiService.deleteLibrary(libraryId: library.id)
+            // Remove from local array on success
+            libraries.removeAll { $0.id == library.id }
+            print("✅ Deleted library \(library.name) (\(library.id.uuidString))")
+        } catch {
+            print("❌ Failed to delete library: \(error)")
+            throw error
+        }
+    }
 }

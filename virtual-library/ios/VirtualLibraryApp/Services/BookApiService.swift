@@ -289,6 +289,39 @@ class BookApiService: ObservableObject {
         }
     }
     
+    /// Delete a library
+    func deleteLibrary(libraryId: UUID) async throws {
+        let url = URL(string: "\(baseURL)/api/libraries/\(libraryId.uuidString)")!
+        
+        print("🔵 [API] Deleting library")
+        print("   URL: \(url.absoluteString)")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [API] Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("🔵 [API] Delete response status: \(httpResponse.statusCode)")
+            
+            // 204 No Content is the expected success response
+            guard httpResponse.statusCode == 204 || (200...299).contains(httpResponse.statusCode) else {
+                print("❌ [API] HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            print("✅ [API] Library deleted successfully")
+        } catch {
+            print("❌ [API] Error deleting library: \(error)")
+            throw error
+        }
+    }
+    
     /// Get libraries by owner
     func getLibrariesByOwner(_ owner: String) async throws -> [LibraryModel] {
         let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner

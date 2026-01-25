@@ -75,7 +75,9 @@ public class OpenLibraryProvider : IBookProvider
         {
             _logger.LogInformation("OpenLibrary: Searching for text: {Text}", searchText);
             
-            var response = await _httpClient.GetAsync($"search.json?q={Uri.EscapeDataString(searchText)}&limit=10", cancellationToken);
+            // Request specific fields including ISBN to ensure they're returned
+            var fields = "key,title,author_name,publisher,first_publish_year,number_of_pages_median,isbn,cover_i,edition_count";
+            var response = await _httpClient.GetAsync($"search.json?q={Uri.EscapeDataString(searchText)}&fields={fields}&limit=10", cancellationToken);
             
             if (!response.IsSuccessStatusCode)
             {
@@ -84,6 +86,8 @@ public class OpenLibraryProvider : IBookProvider
             }
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogDebug("OpenLibrary search response: {Response}", content);
+            
             var result = JsonSerializer.Deserialize<OpenLibrarySearchResponse>(content);
 
             if (result?.Docs == null || result.Docs.Count == 0)
@@ -93,6 +97,11 @@ public class OpenLibraryProvider : IBookProvider
             }
 
             _logger.LogInformation("OpenLibrary returned {Count} results", result.Docs.Count);
+            
+            // Log ISBN availability for debugging
+            var resultsWithIsbn = result.Docs.Count(d => d.Isbn != null && d.Isbn.Any());
+            _logger.LogInformation("OpenLibrary: {Count} of {Total} results have ISBN", resultsWithIsbn, result.Docs.Count);
+            
             return result.Docs.Select(MapToBook).Where(b => b != null).Cast<Book>().ToList();
         }
         catch (Exception ex)
