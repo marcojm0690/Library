@@ -19,6 +19,10 @@ struct MultiBookScanView: View {
         cameraView
             .onAppear {
                 viewModel.startScanning()
+                // Set current library to filter out books already in it
+                Task {
+                    await viewModel.setCurrentLibrary(libraryId)
+                }
             }
             .onDisappear {
                 viewModel.stopScanning()

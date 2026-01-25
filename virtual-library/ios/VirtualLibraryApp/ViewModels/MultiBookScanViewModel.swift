@@ -13,7 +13,11 @@ class MultiBookScanViewModel: ObservableObject {
     private var lastProcessTime: Date = .distantPast
     private let processingInterval: TimeInterval = 2.0 // Process every 2 seconds
     private let maxDetectedBooks = 3 // Limit to reduce API calls
-    var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
+    
+    // Track books added per library (library-specific, not session-wide)
+    private var booksInCurrentLibrary: Set<UUID> = [] // Book IDs already in the library
+    private var currentLibraryId: UUID? // Currently selected library
+    
     private var lastDetectionTime: Date = .distantPast
     private let detectionPersistDuration: TimeInterval = 30.0 // Keep detections for 30 seconds
     
@@ -40,6 +44,28 @@ class MultiBookScanViewModel: ObservableObject {
     
     func getCameraSession() -> AVCaptureSession {
         return cameraManager.session
+    }
+    
+    /// Set the current library and load its books to avoid duplicates
+    func setCurrentLibrary(_ libraryId: UUID) async {
+        guard currentLibraryId != libraryId else { return }
+        
+        currentLibraryId = libraryId
+        booksInCurrentLibrary.removeAll()
+        
+        // Load books already in this library
+        do {
+            let existingBooks = try await detectionService.apiService.getBooksInLibrary(libraryId: libraryId)
+            booksInCurrentLibrary = Set(existingBooks.compactMap { $0.id })
+            print("📚 [ViewModel] Library \(libraryId) has \(booksInCurrentLibrary.count) existing books")
+        } catch {
+            print("⚠️ [ViewModel] Could not load library books: \(error)")
+        }
+    }
+    /// Check if a book is already in the current library
+    private func isBookInCurrentLibrary(_ bookId: UUID?) -> Bool {
+        guard let bookId = bookId else { return false }
+        return booksInCurrentLibrary.contains(bookId)
     }
     
     private func processFrame(_ pixelBuffer: CVPixelBuffer) async {
@@ -91,7 +117,13 @@ class MultiBookScanViewModel: ObservableObject {
                 print("   Source: \(bestMatch.source ?? "nil")")
                 
                 // Only take the first (best match) book to avoid cluttering UI
-                var confirmedDetection = detection
+                varCheck if book is already in current library
+                if isBookInCurrentLibrary(bestMatch.id) {
+                    print("⏭️ [ViewModel] Skipping - book already in current library")
+                    continue
+                }
+                
+                //  confirmedDetection = detection
                 confirmedDetection.book = bestMatch
                 confirmedDetection.isConfirmed = true
                 updatedBooks.append(confirmedDetection)
@@ -150,14 +182,9 @@ class MultiBookScanViewModel: ObservableObject {
             
             print("   Saved Book ID: \(bookId.uuidString)")
             
-            // Step 2: Add book to library
-            print("🔄 [addBookToLibrary] Step 2: Adding book to library...")
-            try await detectionService.apiService.addBooksToLibrary(libraryId: libraryId, bookIds: [bookId])
-            print("✅ [addBookToLibrary] Book successfully added to library")
-            
-            // Add to ignored texts so we don't detect this book again
-            ignoredTexts.insert(detectedBook.detectedText)
-            print("   Added to ignored list: \(detectedBook.detectedText)")
+            // Step 2:current library's book list to prevent re-detection
+            booksInCurrentLibrary.insert(bookId)
+            print("   Added to library's book list: \(bookId)")
             
             // Remove from detected books and overlays
             let beforeCount = detectedBooks.count
@@ -171,12 +198,18 @@ class MultiBookScanViewModel: ObservableObject {
             }
             print("   Removed overlay (\(beforeOverlays) → \(rectangleOverlays.count))")
             
-            print("✅ [addBookToLibrary] Complete - Book added and ignored for future scans")
+            print("✅ [addBookToLibrary] Complete - Book added and won't be detected again in this library")
         } catch {
             print("❌ [addBookToLibrary] Error: \(error)")
             errorMessage = "Error al agregar el libro: \(error.localizedDescription)"
         }
     }
+    
+    func clearIgnoredBooks() {
+        // Reset library-specific tracking (useful when switching libraries or restarting)
+        booksInCurrentLibrary.removeAll()
+        currentLibraryId = nil
+        print("🔄 Cleared library book tracking
     
     func clearIgnoredBooks() {
         // Reset ignored books list (useful when restarting scan session)
