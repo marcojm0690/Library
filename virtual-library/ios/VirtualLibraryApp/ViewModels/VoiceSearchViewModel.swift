@@ -33,7 +33,8 @@ class VoiceSearchViewModel: ObservableObject {
     
     // MARK: - Dependencies
     
-    private let speechService: SpeechRecognitionService
+    // Exposed so VoiceSearchView can read real-time transcription: viewModel.speechService.transcribedText
+    let speechService: SpeechRecognitionService
     private let apiService: BookApiService
     
     // MARK: - Initialization
@@ -61,28 +62,33 @@ class VoiceSearchViewModel: ObservableObject {
         transcribedText = ""
         searchState = .listening
         
-        print("🎤 Starting voice search...")
-        
-        // Start listening with timeout
-        speechService.startListening { [weak self] result in
-            guard let self = self else { return }
+        // Fetch library data to provide dynamic vocabulary hints
+        Task {
+            await loadLibraryVocabulary()
             
-            Task { @MainActor in
-                switch result {
-                case .success(let text):
-                    print("✅ Voice input received: \(text)")
-                    self.transcribedText = text
-                    
-                    // Automatically search when speech ends
-                    if !text.isEmpty {
-                        await self.searchBooks(query: text)
-                    } else {
-                        self.searchState = .error("No speech detected. Please try again.")
+            print("🎤 Starting voice search...")
+            
+            // Start listening with timeout
+            speechService.startListening { [weak self] result in
+                guard let self = self else { return }
+                
+                Task { @MainActor in
+                    switch result {
+                    case .success(let text):
+                        print("✅ Voice input received: \(text)")
+                        self.transcribedText = text
+                        
+                        // Automatically search when speech ends
+                        if !text.isEmpty {
+                            await self.searchBooks(query: text)
+                        } else {
+                            self.searchState = .error("No speech detected. Please try again.")
+                        }
+                        
+                    case .failure(let error):
+                        print("❌ Speech recognition failed: \(error)")
+                        self.searchState = .error("Speech recognition failed: \(error.localizedDescription)")
                     }
-                    
-                case .failure(let error):
-                    print("❌ Speech recognition failed: \(error)")
-                    self.searchState = .error("Speech recognition failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -212,5 +218,46 @@ class VoiceSearchViewModel: ObservableObject {
             return message
         }
         return nil
+    }
+    
+    // MARK: - Dynamic Vocabulary
+    
+    /// Load book titles and author names from the library to improve speech recognition
+    private func loadLibraryVocabulary() async {
+        var hints: [String] = []
+        
+        // Fetch all libraries to get books
+        do {
+            let libraries = try await apiService.getAllLibraries()
+            
+            for library in libraries {
+                // Get books in each library
+                if let books = try? await apiService.getBooksInLibrary(libraryId: library.id) {
+                    for book in books {
+                        // Add book title
+                        hints.append(book.title)
+                        
+                        // Add author names
+                        for author in book.authors {
+                            hints.append(author)
+                        }
+                        
+                        // Add title + author combo for better recognition
+                        if let firstAuthor = book.authors.first {
+                            hints.append("\(book.title) by \(firstAuthor)")
+                        }
+                    }
+                }
+            }
+            
+            // Set the vocabulary hints
+            await MainActor.run {
+                speechService.vocabularyHints = hints
+                print("📚 Loaded \(hints.count) vocabulary hints from library")
+            }
+        } catch {
+            print("⚠️ Could not load library vocabulary: \(error)")
+            // Continue without custom hints
+        }
     }
 }

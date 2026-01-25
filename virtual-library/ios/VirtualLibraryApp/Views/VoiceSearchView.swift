@@ -170,9 +170,31 @@ struct VoiceSearchView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Speak clearly into your device")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            // Real-time transcription display
+            if !viewModel.speechService.transcribedText.isEmpty {
+                VStack(spacing: 8) {
+                    Text("You said:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text("\"\(viewModel.speechService.transcribedText)\"")
+                        .font(.title3)
+                        .fontWeight(.medium)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.blue.opacity(0.1))
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                }
+                .animation(.spring(response: 0.3), value: viewModel.speechService.transcribedText)
+            } else {
+                Text("Speak clearly into your device")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             
             // Stop button
             Button(action: { viewModel.stopListening() }) {

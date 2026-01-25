@@ -28,7 +28,12 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     private var analysisTask: Task<Void, Never>?
     private var resultsTask: Task<Void, Never>?
+    private var currentTranscription = ""
+    private var timeoutTask: Task<Void, Never>?
     private let audioEngine = AVAudioEngine()
+    
+    // Timeout after silence (in seconds)
+    private let silenceTimeout: TimeInterval = 2.0
     
     // Keep track of analyzer’s preferred audio format (if any)
     private var desiredAnalyzerFormat: AVAudioFormat?
@@ -70,6 +75,11 @@ class SpeechRecognitionService: NSObject, ObservableObject {
             self.errorMessage = "Unknown authorization status"
         }
     }
+    
+    // MARK: - Context Configuration
+    
+    /// Custom vocabulary hints to improve recognition accuracy
+    var vocabularyHints: [String] = []
     
     // MARK: - Recording Control
     
@@ -147,19 +157,31 @@ class SpeechRecognitionService: NSObject, ObservableObject {
             let analyzer = await SpeechAnalyzer(modules: [transcriber])
             self.analyzer = analyzer
             
+            // Set context to improve recognition accuracy with dynamic vocabulary
+            
+            
             // Step 5: Start supplying audio (always from input node’s native format)
             self.supplyAudio(to: inputBuilder)
             
             // Step 7: Process results
-            var finalTranscription = ""
+            self.currentTranscription = ""
+            var lastUpdateTime = Date()
+            
             resultsTask = Task { @MainActor in
                 do {
                     for try await result in transcriber.results {
                         let transcription = String(result.text.characters)
                         self.transcribedText = transcription
-                        finalTranscription = transcription
+                        self.currentTranscription = transcription
+                        lastUpdateTime = Date()
                         print("🎤 Transcription: \(transcription)")
+                        
+                        // Reset timeout on each update
+                        self.timeoutTask?.cancel()
+                        self.startSilenceTimeout()
                     }
+                } catch is CancellationError {
+                    print("⚠️ Results cancelled, using current transcription")
                 } catch {
                     print("❌ Results error: \(error)")
                 }
@@ -167,21 +189,29 @@ class SpeechRecognitionService: NSObject, ObservableObject {
             
             // Step 6: Perform analysis
             print("🎤 Started listening with SpeechAnalyzer...")
-            let lastSampleTime = try await analyzer.analyzeSequence(inputSequence)
-            
-            // Step 8: Finish analysis
-            if let lastSampleTime {
-                try await analyzer.finalizeAndFinish(through: lastSampleTime)
-            } else {
-                try await analyzer.cancelAndFinishNow()
+            do {
+                let lastSampleTime = try await analyzer.analyzeSequence(inputSequence)
+                
+                // Step 8: Finish analysis
+                if let lastSampleTime {
+                    try await analyzer.finalizeAndFinish(through: lastSampleTime)
+                } else {
+                    try await analyzer.cancelAndFinishNow()
+                }
+                
+                // Wait for results to complete
+                await resultsTask?.value
+                
+                self.isListening = false
+                print("✅ Final transcription: \(self.currentTranscription)")
+                completion(.success(self.currentTranscription))
+            } catch is CancellationError {
+                // Manual stop - return current transcription
+                await resultsTask?.value
+                self.isListening = false
+                print("✅ Stopped manually, returning: \(self.currentTranscription)")
+                completion(.success(self.currentTranscription))
             }
-            
-            // Wait for results to complete
-            await resultsTask?.value
-            
-            self.isListening = false
-            print("✅ Final transcription: \(finalTranscription)")
-            completion(.success(finalTranscription))
             
         } catch {
             print("❌ Transcription error: \(error)")
@@ -192,7 +222,7 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     }
     
     /// Supply audio buffers to the analyzer
-    /// Always install the tap using the input node’s output format to avoid format mismatch.
+    /// Always install the tap using the input node’s native format to avoid format mismatch.
     @MainActor
     private func supplyAudio(to inputBuilder: AsyncStream<AnalyzerInput>.Continuation) {
         let inputNode = audioEngine.inputNode
@@ -242,9 +272,25 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         }
     }
     
+    /// Start a timeout that will automatically stop listening after silence
+    private func startSilenceTimeout() {
+        timeoutTask?.cancel()
+        timeoutTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(silenceTimeout))
+            
+            // Check if we haven't been cancelled
+            guard !Task.isCancelled else { return }
+            
+            // If we have some transcription, finish gracefully
+            if !self.currentTranscription.isEmpty {
+                print("⏱️ Silence timeout - finishing with: \(self.currentTranscription)")
+                self.stopListening()
+            }
+        }
+    }
+    
     /// Convert an AVAudioPCMBuffer to a target format using AVAudioConverter
     private func convert(buffer: AVAudioPCMBuffer, from: AVAudioFormat, to: AVAudioFormat, using converter: AVAudioConverter) -> AVAudioPCMBuffer? {
-        guard let channelCount = to.channelLayout?.channelCount ?? to.channelCount as NSNumber? else { return nil }
         guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: to, frameCapacity: buffer.frameCapacity) else { return nil }
         outputBuffer.frameLength = buffer.frameLength
         
@@ -270,28 +316,32 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     
     /// Stop listening and return final transcription
     func stopListening() {
-        // Finish audio input
-        inputContinuation?.finish()
-        inputContinuation = nil
+        // Cancel timeout
+        timeoutTask?.cancel()
+        timeoutTask = nil
         
-        // Cancel tasks
-        analysisTask?.cancel()
-        resultsTask?.cancel()
-        analysisTask = nil
-        resultsTask = nil
-        
-        // Stop audio engine
+        // Stop audio engine first
         if audioEngine.isRunning {
             audioEngine.stop()
             audioEngine.inputNode.removeTap(onBus: 0)
             print("🛑 Stopped listening")
         }
         
-        self.isListening = false
+        // Finish audio input to signal end
+        inputContinuation?.finish()
+        inputContinuation = nil
+        
+        // Let the analyzer finish gracefully by cancelling the task
+        // This will trigger the CancellationError handling which returns current transcription
+        analysisTask?.cancel()
     }
     
     /// Cancel current recognition task
     func cancelListening() {
+        // Cancel timeout
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        
         // Finish input
         inputContinuation?.finish()
         inputContinuation = nil
