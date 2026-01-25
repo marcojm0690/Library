@@ -14,9 +14,21 @@ namespace VirtualLibrary.Api.Controllers;
 /// Provides endpoints for ISBN lookup, cover-based search, and image-based identification.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
 public class BooksController : ControllerBase
 {
+    /// <summary>
+    /// ADMIN: Delete all books enriched by ISBNdb (Source == "ISBNdb")
+    /// </summary>
+    [HttpDelete("delete-isbndb-books")]
+    public async Task<IActionResult> DeleteAllIsbndbBooks()
+    {
+        if (_bookRepository is MongoDbBookRepository mongoRepo)
+        {
+            var count = await mongoRepo.DeleteAllIsbndbBooksAsync();
+            return Ok(new { deleted = count });
+        }
+        return BadRequest(new { error = "Repository does not support bulk delete." });
+    }
     private readonly SearchByIsbnService _searchByIsbnService;
     private readonly SearchByCoverService _searchByCoverService;
     private readonly AzureBlobLibraryRepository _libraryRepository;

@@ -11,6 +11,24 @@ namespace VirtualLibrary.Api.Infrastructure.Persistence;
 /// </summary>
 public class MongoDbBookRepository : IBookRepository, IDisposable
 {
+    /// <summary>
+    /// Delete all books where Source == "ISBNdb"
+    /// </summary>
+    public async Task<long> DeleteAllIsbndbBooksAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var filter = Builders<MongoBook>.Filter.Eq(b => b.Source, "ISBNdb");
+            var result = await _collection.DeleteManyAsync(filter, cancellationToken);
+            _logger.LogInformation("Deleted {Count} books with Source=ISBNdb", result.DeletedCount);
+            return result.DeletedCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting ISBNdb books");
+            throw;
+        }
+    }
     private readonly IMongoClient _mongoClient;
     private readonly IMongoDatabase _database;
     private readonly IMongoCollection<MongoBook> _collection;

@@ -67,14 +67,24 @@ else
 
 // Register external book provider services
 // Register each provider separately so they can all be resolved in IEnumerable<IBookProvider>
-builder.Services.AddHttpClient<OpenLibraryProvider>();
+// Priority order for cover images: ISBNdb > Wikidata > Google Books > Open Library
+// builder.Services.AddHttpClient<ISBNdbBookProvider>();
+builder.Services.AddHttpClient<WikidataBookProvider>();
+builder.Services.AddHttpClient<InventaireBookProvider>();
 builder.Services.AddHttpClient<GoogleBooksProvider>();
+builder.Services.AddHttpClient<OpenLibraryProvider>();
 
-// Register as IBookProvider implementations
-builder.Services.AddScoped<IBookProvider, OpenLibraryProvider>(sp => 
-    sp.GetRequiredService<OpenLibraryProvider>());
+// Register as IBookProvider implementations in priority order
+// builder.Services.AddScoped<IBookProvider, ISBNdbBookProvider>(sp => 
+//     sp.GetRequiredService<ISBNdbBookProvider>());
+builder.Services.AddScoped<IBookProvider, WikidataBookProvider>(sp => 
+    sp.GetRequiredService<WikidataBookProvider>());
+builder.Services.AddScoped<IBookProvider, InventaireBookProvider>(sp => 
+    sp.GetRequiredService<InventaireBookProvider>());
 builder.Services.AddScoped<IBookProvider, GoogleBooksProvider>(sp => 
     sp.GetRequiredService<GoogleBooksProvider>());
+builder.Services.AddScoped<IBookProvider, OpenLibraryProvider>(sp => 
+    sp.GetRequiredService<OpenLibraryProvider>());
 
 // Configure CORS for iOS app
 builder.Services.AddCors(options =>

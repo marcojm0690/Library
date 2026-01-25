@@ -314,6 +314,7 @@ public class LibrariesController : ControllerBase
 
     /// <summary>
     /// Enriches book data by fetching from external APIs if data is missing
+    /// Priority: ISBNdb > Wikidata > Google Books > Open Library (for cover images)
     /// </summary>
     private async Task<Book> EnrichBookDataAsync(Book book, IEnumerable<IBookProvider> bookProviders)
     {
@@ -330,6 +331,7 @@ public class LibrariesController : ControllerBase
         {
             _logger.LogInformation("Enriching book data for: {Title} (ISBN: {Isbn})", book.Title, book.Isbn);
             
+            // Try each provider in order until we get a cover image
             foreach (var provider in bookProviders)
             {
                 try
@@ -337,8 +339,14 @@ public class LibrariesController : ControllerBase
                     var enrichedBook = await provider.SearchByIsbnAsync(book.Isbn);
                     if (enrichedBook != null)
                     {
-                        // Merge data - keep existing data, only fill in missing fields
-                        book.CoverImageUrl ??= enrichedBook.CoverImageUrl;
+                        // Prioritize cover images - only fill if we don't have one yet
+                        if (string.IsNullOrEmpty(book.CoverImageUrl) && !string.IsNullOrEmpty(enrichedBook.CoverImageUrl))
+                        {
+                            book.CoverImageUrl = enrichedBook.CoverImageUrl;
+                            _logger.LogInformation("Got cover image from {Provider}", provider.ProviderName);
+                        }
+                        
+                        // Merge other data - keep existing data, only fill in missing fields
                         book.Description ??= enrichedBook.Description;
                         book.Publisher ??= enrichedBook.Publisher;
                         book.PublishYear ??= enrichedBook.PublishYear;
@@ -355,7 +363,12 @@ public class LibrariesController : ControllerBase
                         
                         // Update the book in the database with enriched data
                         await _bookRepository.UpdateAsync(book);
-                        break;
+                        
+                        // If we have cover image now, we can stop (other data is less critical)
+                        if (!string.IsNullOrEmpty(book.CoverImageUrl))
+                        {
+                            break;
+                        }
                     }
                 }
                 catch (Exception ex)
