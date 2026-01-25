@@ -68,11 +68,11 @@ struct BookDetailView: View {
                         }
                         
                         if let publishYear = book.publishYear {
-                            DetailRow(label: "Año", value: "\\(publishYear)", icon: "calendar")
+                            DetailRow(label: "Año", value: "\(publishYear)", icon: "calendar")
                         }
                         
                         if let pageCount = book.pageCount {
-                            DetailRow(label: "Páginas", value: "\\(pageCount)", icon: "doc.text")
+                            DetailRow(label: "Páginas", value: "\(pageCount)", icon: "doc.text")
                         }
                         
                         if let source = book.source {

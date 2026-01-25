@@ -6,6 +6,9 @@ struct MultiBookScanView: View {
     @Environment(\.dismiss) private var dismiss
     let libraryId: UUID
     
+    @State private var showProcessingToast = false
+    @State private var processingMessage = ""
+    
     init(libraryId: UUID) {
         self.libraryId = libraryId
         let apiService = BookApiService(baseURL: "https://virtual-library-api-web.azurewebsites.net")
@@ -30,6 +33,7 @@ struct MultiBookScanView: View {
                 }
             }
             .overlay(instructionsOverlay)
+            .overlay(processingToastOverlay, alignment: .bottom)
     }
     
     private var cameraView: some View {
@@ -171,11 +175,49 @@ struct MultiBookScanView: View {
                     DetectedBookCard(
                         detectedBook: detectedBook,
                         onAdd: {
+                            print("🔵 [MultiBookScanView] onAdd callback triggered for book: \(detectedBook.book?.title ?? "unknown")")
+                            
+                            // Remove card immediately for smooth UX
+                            withAnimation {
+                                viewModel.detectedBooks.removeAll { $0.id == detectedBook.id }
+                                viewModel.rectangleOverlays.removeAll { $0.rect == detectedBook.boundingBox }
+                            }
+                            
+                            // Add to ignored list immediately
+                            viewModel.ignoredTexts.insert(detectedBook.detectedText)
+                            
+                            // Show processing toast
+                            processingMessage = "Agregando '\(detectedBook.book?.title ?? "libro")'..."
+                            withAnimation {
+                                showProcessingToast = true
+                            }
+                            
+                            // Perform API call asynchronously
                             Task {
-                                await viewModel.addBookToLibrary(detectedBook, libraryId: libraryId)
+                                do {
+                                    guard let book = detectedBook.book else { return }
+                                    
+                                    // Save and add to library
+                                    let savedBook = try await viewModel.detectionService.apiService.saveBook(book)
+                                    guard let bookId = savedBook.id else { return }
+                                    try await viewModel.detectionService.apiService.addBooksToLibrary(libraryId: libraryId, bookIds: [bookId])
+                                    
+                                    // Show success1_500_000_000)
+                                    withAnimation {
+                                        showProcessingToast = false
+                                    }
+                                } catch {
+                                    // Show error
+                                    processingMessage = "❌ Error al agregar"
+                                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                                    withAnimation {
+                                        showProcessingToast = false
+                                    }
+                                }
                             }
                         },
                         onDismiss: {
+                            print("🔵 [MultiBookScanView] onDismiss callback triggered")
                             withAnimation {
                                 viewModel.removeDetection(detectedBook)
                             }
@@ -231,6 +273,43 @@ struct MultiBookScanView: View {
                 }
             }
         }
+    }
+    
+    private var processingToastOverlay: some View {
+        Group {
+            if showProcessingToast {
+                HStack(spacing: 12) {
+                    if processingMessage.contains("✅") {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.title3)
+                    } else if processingMessage.contains("❌") {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red)
+                            .font(.title3)
+                    } else {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .tint(.white)
+                    }
+                    
+                    Text(processingMessage)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.85))
+                        .shadow(radius: 10)
+                )
+                .padding(.bottom, 140)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showProcessingToast)
     }
 }
 

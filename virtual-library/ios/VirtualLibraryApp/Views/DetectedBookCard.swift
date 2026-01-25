@@ -17,70 +17,44 @@ struct DetectedBookCard: View {
     
     var body: some View {
         ZStack {
-            // Background swipe indicators with gradient
-            HStack(spacing: 0) {
-                // Left side - Add (green)
-                ZStack {
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.green.opacity(0.8), Color.green]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    
-                    HStack {
+            // Background action indicator - only show on active side
+            if abs(offset) > 10 {
+                HStack {
+                    if offset < 0 {
+                        // Left side - Dismiss
                         Spacer()
-                        VStack(spacing: 6) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 32))
-                            Text("Agregar")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.trailing, 24)
-                        .scaleEffect(offset < -swipeThreshold ? 1.1 : 1.0)
-                        .animation(.spring(response: 0.3), value: offset < -swipeThreshold)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                
-                // Right side - Dismiss (red)
-                ZStack {
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    
-                    HStack {
-                        VStack(spacing: 6) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 32))
-                            Text("Descartar")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.leading, 24)
-                        .scaleEffect(offset > swipeThreshold ? 1.1 : 1.0)
-                        .animation(.spring(response: 0.3), value: offset > swipeThreshold)
+                        swipeActionView(
+                            color: .red,
+                            icon: "xmark.circle.fill",
+                            text: "Descartar",
+                            progress: min(abs(offset) / swipeThreshold, 1.0)
+                        )
+                        .frame(width: abs(offset))
+                    } else {
+                        // Right side - Add
+                        swipeActionView(
+                            color: .green,
+                            icon: "plus.circle.fill",
+                            text: "Agregar",
+                            progress: min(offset / swipeThreshold, 1.0)
+                        )
+                        .frame(width: offset)
                         Spacer()
                     }
                 }
-                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .opacity(abs(offset) > 10 ? min(abs(offset) / 100.0, 1.0) : 0)
             
             // Main card content
             cardContent
                 .offset(x: offset)
-                .rotationEffect(.degrees(Double(offset) / 25.0))
-                .scaleEffect(abs(offset) > swipeThreshold ? 0.95 : 1.0)
                 .gesture(
                     DragGesture(minimumDistance: 10)
                         .onChanged { gesture in
-                            guard detectedBook.book != nil else { return }
+                            guard detectedBook.book != nil else {
+                                print("❌ [DetectedBookCard] Cannot drag - no book details")
+                                return
+                            }
                             offset = gesture.translation.width
                             
                             // Haptic feedback when crossing threshold
@@ -89,26 +63,34 @@ struct DetectedBookCard: View {
                             }
                         }
                         .onEnded { gesture in
-                            guard detectedBook.book != nil else { return }
+                            guard detectedBook.book != nil else {
+                                print("❌ [DetectedBookCard] No book details, cannot swipe")
+                                return
+                            }
                             
-                            if offset < -swipeThreshold {
-                                // Swipe left to add
+                            print("🔵 [DetectedBookCard] Swipe ended - offset: \(offset)")
+                            
+                            if offset > swipeThreshold {
+                                // Swipe RIGHT to add
+                                print("✅ [DetectedBookCard] Swipe RIGHT detected - Adding book!")
                                 successHaptic.notificationOccurred(.success)
                                 showSuccessFeedback = true
                                 
                                 withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                                    offset = -600
+                                    offset = 600
                                 }
                                 
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    print("🔵 [DetectedBookCard] Calling onAdd() callback...")
                                     onAdd()
                                 }
-                            } else if offset > swipeThreshold {
-                                // Swipe right to dismiss
+                            } else if offset < -swipeThreshold {
+                                // Swipe LEFT to dismiss
+                                print("🔵 [DetectedBookCard] Swipe LEFT detected - Dismissing book")
                                 haptic.impactOccurred()
                                 
                                 withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                                    offset = 600
+                                    offset = -600
                                 }
                                 
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -141,6 +123,40 @@ struct DetectedBookCard: View {
                 )
         }
         .padding(.horizontal, 4)
+    }
+    
+    @ViewBuilder
+    private func swipeActionView(color: Color, icon: String, text: String, progress: Double) -> some View {
+        ZStack {
+            color
+            
+            HStack {
+                if icon.contains("plus") {
+                    Spacer()
+                }
+                
+                VStack(spacing: 4) {
+                    Image(systemName: icon)
+                        .font(.system(size: progress > 0.8 ? 36 : 28))
+                        .fontWeight(.semibold)
+                    
+                    if progress > 0.6 {
+                        Text(text)
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .opacity(progress > 0.7 ? 1.0 : 0.0)
+                    }
+                }
+                .foregroundColor(.white)
+                .scaleEffect(progress > 0.8 ? 1.1 : 1.0)
+                .padding(.horizontal, 20)
+                
+                if icon.contains("xmark") {
+                    Spacer()
+                }
+            }
+        }
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: progress)
     }
     
     private var cardContent: some View {
@@ -273,10 +289,10 @@ struct DetectedBookCard: View {
                             VStack(spacing: 3) {
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.green.opacity(0.6))
+                                    .foregroundColor(.red.opacity(0.6))
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.red.opacity(0.6))
+                                    .foregroundColor(.green.opacity(0.6))
                             }
                         }
                     }

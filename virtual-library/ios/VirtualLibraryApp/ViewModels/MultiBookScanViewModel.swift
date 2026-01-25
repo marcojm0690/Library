@@ -9,11 +9,11 @@ class MultiBookScanViewModel: ObservableObject {
     @Published var rectangleOverlays: [(rect: CGRect, hasBook: Bool)] = []
     
     private let cameraManager = CameraSessionManager()
-    private let detectionService: MultiBookDetectionService
+    let detectionService: MultiBookDetectionService
     private var lastProcessTime: Date = .distantPast
     private let processingInterval: TimeInterval = 2.0 // Process every 2 seconds
     private let maxDetectedBooks = 3 // Limit to reduce API calls
-    private var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
+    var ignoredTexts: Set<String> = [] // Track books that have been added to ignore them
     private var lastDetectionTime: Date = .distantPast
     private let detectionPersistDuration: TimeInterval = 30.0 // Keep detections for 30 seconds
     

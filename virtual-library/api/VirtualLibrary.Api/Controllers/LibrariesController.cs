@@ -140,6 +140,11 @@ public class LibrariesController : ControllerBase
         var created = await _libraryRepository.CreateAsync(library);
         _logger.LogInformation("✅ Library created with ID: {LibraryId}", created.Id);
         
+        // Invalidate owner cache
+        var ownerCacheKey = $"libraries:owner:{request.Owner}";
+        await _cache.RemoveAsync(ownerCacheKey);
+        _logger.LogInformation("🔵 Invalidated cache for owner: {Owner}", request.Owner);
+        
         var response = MapToResponse(created);
 
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, response);
