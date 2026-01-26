@@ -355,6 +355,7 @@ struct WaveformAnimationView: View {
 
 struct VoiceSearchView_Previews: PreviewProvider {
     static var previews: some View {
-        VoiceSearchView(libraryId: UUID())
+        VoiceSearchView(libraryId: UUID(), userId: nil, onBookAdded: nil)
+            .environmentObject(AuthenticationService())
     }
 }
