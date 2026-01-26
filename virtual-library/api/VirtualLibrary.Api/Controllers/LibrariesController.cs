@@ -741,14 +741,14 @@ public class LibrariesController : ControllerBase
         try
         {
             // Search for books in each tag category to get related terms
-            foreach (var tag in tags.Take(3)) // Limit to first 3 tags to avoid too many API calls
+            foreach (var tag in tags.Take(5)) // Process up to 5 tags
             {
                 _logger.LogInformation("Enriching vocabulary with tag: {Tag}", tag);
                 
                 // Search Google Books for this tag/genre
                 var googleBooks = await _googleBooksProvider.SearchByTextAsync(tag);
                 
-                foreach (var book in googleBooks.Take(5)) // Take first 5 results
+                foreach (var book in googleBooks.Take(10)) // Take first 10 results for more vocabulary
                 {
                     // Add authors from related books
                     foreach (var author in book.Authors)
@@ -756,9 +756,71 @@ public class LibrariesController : ControllerBase
                         if (!string.IsNullOrWhiteSpace(author) && author.Length > 3)
                         {
                             hints.Add(author);
+                            
+                            // Add individual name parts
+                            var nameParts = author.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var part in nameParts)
+                            {
+                                if (part.Length > 2)
+                                {
+                                    hints.Add(part);
+                                }
+                            }
                         }
                     }
+                    
+                    // Add book titles from the genre
+                    if (!string.IsNullOrWhiteSpace(book.Title))
+                    {
+                        hints.Add(book.Title);
+                        
+                        // Add significant words from titles (filter out common words)
+                        var titleWords = book.Title
+                            .Split(new[] { ' ', ':', '-', '—' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Where(w => w.Length > 4 && !IsCommonWord(w));
+                        
+                        foreach (var word in titleWords)
+                        {
+                            hints.Add(word);
+                        }
+                    }
+                    
+                    // Add publishers for genre context
+                    if (!string.IsNullOrWhiteSpace(book.Publisher))
+                    {
+                        hints.Add(book.Publisher);
+                    }
+                    
+                    // Extract genre-related terms from descriptions
+                    if (!string.IsNullOrWhiteSpace(book.Description))
+                    {
+                        ExtractKeywordsFromDescription(book.Description, hints);
+                    }
                 }
+                
+                // Also search Open Library for the tag
+                var openLibraryBooks = await _openLibraryProvider.SearchByTextAsync(tag);
+                
+                foreach (var book in openLibraryBooks.Take(10))
+                {
+                    // Add authors
+                    foreach (var author in book.Authors)
+                    {
+                        if (!string.IsNullOrWhiteSpace(author) && author.Length > 3)
+                        {
+                            hints.Add(author);
+                        }
+                    }
+                    
+                    // Add titles
+                    if (!string.IsNullOrWhiteSpace(book.Title))
+                    {
+                        hints.Add(book.Title);
+                    }
+                }
+                
+                _logger.LogInformation("Added vocabulary from {GoogleCount} Google Books and {OpenLibraryCount} Open Library books for tag '{Tag}'", 
+                    googleBooks.Count, openLibraryBooks.Count, tag);
             }
         }
         catch (Exception ex)
@@ -766,6 +828,67 @@ public class LibrariesController : ControllerBase
             _logger.LogWarning(ex, "Failed to enrich vocabulary from tags");
             // Continue without enrichment - not critical
         }
+    }
+    
+    /// <summary>
+    /// Extract important keywords from book descriptions for vocabulary hints
+    /// </summary>
+    private void ExtractKeywordsFromDescription(string description, HashSet<string> hints)
+    {
+        var descriptionLower = description.ToLower();
+        
+        // Genre keywords
+        var genreKeywords = new[]
+        {
+            "philosophy", "philosophical", "existential", "metaphysical",
+            "science", "scientific", "biology", "physics", "chemistry",
+            "history", "historical", "medieval", "ancient", "modern",
+            "fantasy", "magical", "wizard", "dragon", "epic",
+            "science fiction", "sci-fi", "cyberpunk", "dystopian", "space",
+            "mystery", "detective", "thriller", "suspense", "crime",
+            "romance", "love", "relationship",
+            "adventure", "journey", "quest",
+            "biography", "memoir", "autobiography",
+            "poetry", "poem", "verse",
+            "classic", "literature", "literary"
+        };
+        
+        foreach (var keyword in genreKeywords)
+        {
+            if (descriptionLower.Contains(keyword))
+            {
+                hints.Add(keyword);
+            }
+        }
+        
+        // Extract capitalized proper nouns (likely important names/places)
+        var words = description.Split(new[] { ' ', '.', ',', ';', ':', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var word in words)
+        {
+            // Look for capitalized words that aren't at start of sentences
+            if (word.Length > 4 && 
+                char.IsUpper(word[0]) && 
+                word.Skip(1).Any(char.IsLower) &&
+                !IsCommonWord(word))
+            {
+                hints.Add(word);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Check if a word is a common word that shouldn't be used as a hint
+    /// </summary>
+    private bool IsCommonWord(string word)
+    {
+        var commonWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "and", "for", "with", "from", "that", "this", "these", "those",
+            "about", "after", "before", "when", "where", "which", "while",
+            "book", "books", "novel", "story", "tales", "volume", "edition"
+        };
+        
+        return commonWords.Contains(word);
     }
     
     /// <summary>
