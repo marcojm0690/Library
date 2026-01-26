@@ -8,6 +8,7 @@ enum BookSortOption: String, CaseIterable {
 struct LibraryDetailView: View {
     let library: LibraryModel
     @StateObject private var viewModel: LibraryDetailViewModel
+    @EnvironmentObject private var authService: AuthenticationService
     @State private var showVoiceSearch = false
     @State private var showAddMenu = false
     @State private var sortOption: BookSortOption = .title
@@ -69,11 +70,15 @@ struct LibraryDetailView: View {
             }
         }
         .sheet(isPresented: $showVoiceSearch) {
-            VoiceSearchView(libraryId: library.id, userId: authService.user?.id) {
-                Task {
-                    await viewModel.refresh()
+            VoiceSearchView(
+                libraryId: library.id,
+                userId: authService.user?.id,
+                onBookAdded: {
+                    Task {
+                        await viewModel.refresh()
+                    }
                 }
-            }
+            )
             .environmentObject(authService)
         }
         .task {
