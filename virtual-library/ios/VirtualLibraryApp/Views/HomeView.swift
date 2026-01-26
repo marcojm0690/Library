@@ -84,7 +84,7 @@ struct HomeView: View {
                     Text("Agregar libros")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 10)
                     
                     VStack(spacing: 12) {
                         NavigationLink(destination: ScanIsbnView()) {
@@ -105,7 +105,7 @@ struct HomeView: View {
                             )
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 15)
                     
                     Divider()
                         .padding(.vertical, 8)

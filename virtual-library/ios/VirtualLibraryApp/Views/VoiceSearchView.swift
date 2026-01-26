@@ -47,11 +47,11 @@ struct VoiceSearchView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Voice Search")
+            .navigationTitle("Buscado por voz")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
+                    Button("Cerrar") {
                         viewModel.cancelVoiceSearch()
                         dismiss()
                     }
@@ -59,7 +59,7 @@ struct VoiceSearchView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.isListening {
-                        Button("Stop") {
+                        Button("Detener") {
                             viewModel.stopListening()
                         }
                         .foregroundColor(.red)
@@ -83,7 +83,7 @@ struct VoiceSearchView: View {
                     )
                 )
             
-            Text("Say the book title or author")
+            Text("Diga en voz alta el nombre del libro o Autor")
                 .font(.headline)
                 .foregroundColor(.secondary)
             
@@ -103,13 +103,13 @@ struct VoiceSearchView: View {
     private var idleStateView: some View {
         VStack(spacing: 24) {
             VStack(spacing: 12) {
-                Text("Try saying:")
+                Text("Intenta decir:")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    exampleText("\"The Great Gatsby\"")
-                    exampleText("\"1984 by George Orwell\"")
+                    exampleText("\"La loca de Gandoca\"")
+                    exampleText("\"1984 de George Orwell\"")
                     exampleText("\"Harry Potter\"")
                 }
                 .padding()
@@ -136,7 +136,7 @@ struct VoiceSearchView: View {
                             .foregroundColor(.white)
                     }
                     
-                    Text("Tap to Start")
+                    Text("Presione para iniciar")
                         .font(.headline)
                         .foregroundColor(.primary)
                 }
@@ -173,7 +173,7 @@ struct VoiceSearchView: View {
             // Real-time transcription display
             if !viewModel.speechService.transcribedText.isEmpty {
                 VStack(spacing: 8) {
-                    Text("You said:")
+                    Text("Usted dijo:")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -191,7 +191,7 @@ struct VoiceSearchView: View {
                 }
                 .animation(.spring(response: 0.3), value: viewModel.speechService.transcribedText)
             } else {
-                Text("Speak clearly into your device")
+                Text("Hable claro")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -200,7 +200,7 @@ struct VoiceSearchView: View {
             Button(action: { viewModel.stopListening() }) {
                 HStack {
                     Image(systemName: "stop.circle.fill")
-                    Text("Stop Listening")
+                    Text("Detener")
                 }
                 .font(.headline)
                 .foregroundColor(.white)
@@ -221,10 +221,10 @@ struct VoiceSearchView: View {
                 .scaleEffect(1.5)
                 .padding()
             
-            Text("Searching for books...")
+            Text("Buscando libros...")
                 .font(.headline)
             
-            Text("This should only take a moment")
+            Text("Un momento...")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -236,11 +236,11 @@ struct VoiceSearchView: View {
     private func resultsView(books: [Book]) -> some View {
         VStack(spacing: 16) {
             HStack {
-                Text("\(books.count) \(books.count == 1 ? "Result" : "Results") Found")
+                Text("\(books.count) \(books.count == 1 ? "Resultado" : "Resultados") Encontrado")
                     .font(.headline)
                 Spacer()
                 
-                Button("Search Again") {
+                Button("Buscar de nuevo.") {
                     viewModel.reset()
                 }
                 .font(.subheadline)
@@ -258,13 +258,13 @@ struct VoiceSearchView: View {
                                         try await viewModel.addBookToLibrary(book, libraryId: libraryId)
                                         onBookAdded?()
                                     } catch {
-                                        print("Error adding book: \(error)")
+                                        print("Error añadiendo libro: \(error)")
                                     }
                                 }
                             },
                             onTap: {
                                 // Could navigate to book detail here
-                                print("Tapped book: \(book.title)")
+                                print("Libro seleccionado: \(book.title)")
                             }
                         )
                     }
@@ -281,7 +281,7 @@ struct VoiceSearchView: View {
                 .font(.system(size: 50))
                 .foregroundColor(.orange)
             
-            Text("Something Went Wrong")
+            Text("Algo salió mal")
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -294,7 +294,7 @@ struct VoiceSearchView: View {
             Button(action: { viewModel.reset() }) {
                 HStack {
                     Image(systemName: "arrow.clockwise")
-                    Text("Try Again")
+                    Text("Intentar nuevamente")
                 }
                 .font(.headline)
                 .foregroundColor(.white)

@@ -33,7 +33,6 @@ class VoiceSearchViewModel: ObservableObject {
     
     // MARK: - Dependencies
     
-    // Exposed so VoiceSearchView can read real-time transcription: viewModel.speechService.transcribedText
     let speechService: SpeechRecognitionService
     private let apiService: BookApiService
     
@@ -64,7 +63,6 @@ class VoiceSearchViewModel: ObservableObject {
         
         // Fetch library data to provide dynamic vocabulary hints
         Task {
-            await loadLibraryVocabulary()
             
             print("🎤 Starting voice search...")
             

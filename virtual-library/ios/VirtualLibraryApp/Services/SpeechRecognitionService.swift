@@ -3,7 +3,7 @@ import Speech
 import AVFoundation
 
 /// Service responsible for converting speech to text using iOS Speech framework
-/// Uses the modern SpeechAnalyzer API for improved accuracy and performance (iOS 26+)
+/// Uses SpeechTranscriber directly for real-time updates and vocabulary support (iOS 26+)
 @MainActor
 class SpeechRecognitionService: NSObject, ObservableObject {
     
@@ -34,10 +34,6 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     
     // Timeout after silence (in seconds)
     private let silenceTimeout: TimeInterval = 2.0
-    
-    // Keep track of analyzer’s preferred audio format (if any)
-    private var desiredAnalyzerFormat: AVAudioFormat?
-    private var bufferConverter: AVAudioConverter?
     
     // MARK: - Initialization
     
@@ -122,11 +118,11 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         }
     }
     
-    /// Perform transcription using SpeechAnalyzer and SpeechTranscriber (iOS 26+)
+    /// Perform transcription using SpeechTranscriber directly (iOS 26+)
     @MainActor
     private func performTranscription(completion: @escaping (Result<String, Error>) -> Void) async {
         do {
-            // Step 1: Create transcriber module
+            // Step 1: Get supported locale
             guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
                 throw NSError(
                     domain: "SpeechRecognition",
@@ -135,33 +131,32 @@ class SpeechRecognitionService: NSObject, ObservableObject {
                 )
             }
             
-            let transcriber = SpeechTranscriber(locale: locale, preset: SpeechTranscriber.Preset.timeIndexedProgressiveTranscription)
+            // Step 2: Create transcriber with vocabulary hints
+            let transcriber = SpeechTranscriber(
+                locale: locale,
+                preset: .timeIndexedProgressiveTranscription
+            )
+            
             self.transcriber = transcriber
             
-            // Step 2: Check and download assets if needed
+            // Step 3: Check and download assets if needed
             if let installationRequest = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                 try await installationRequest.downloadAndInstall()
             }
             
-            // Step 3: Create input sequence
+            // Step 4: Create input sequence for analyzer
             let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
             self.inputContinuation = inputBuilder
             
-            // Step 4: Create analyzer
-            // Ask for the best available audio format, but DO NOT use it to install the tap directly.
-            // We’ll install the tap with the input node’s format and convert if needed.
-            let bestFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
-            self.desiredAnalyzerFormat = bestFormat
-            self.bufferConverter = nil // reset converter; will be created lazily if needed
-            
-            let analyzer = await SpeechAnalyzer(modules: [transcriber])
+            // Step 5: Create analyzer with transcriber module
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
             self.analyzer = analyzer
             
-            // Set context to improve recognition accuracy with dynamic vocabulary
-            
-            
-            // Step 5: Start supplying audio (always from input node’s native format)
-            self.supplyAudio(to: inputBuilder)
+            // Step 6: Start analysis task - feed inputs to analyzer by analyzing the sequence
+            analysisTask = Task {
+                await analyzer.analyze(on: inputSequence)
+                print("🎤 Input sequence finished")
+            }
             
             // Step 7: Process results
             self.currentTranscription = ""
@@ -173,7 +168,6 @@ class SpeechRecognitionService: NSObject, ObservableObject {
                         let transcription = String(result.text.characters)
                         self.transcribedText = transcription
                         self.currentTranscription = transcription
-                        lastUpdateTime = Date()
                         print("🎤 Transcription: \(transcription)")
                         
                         // Reset timeout on each update
@@ -181,37 +175,23 @@ class SpeechRecognitionService: NSObject, ObservableObject {
                         self.startSilenceTimeout()
                     }
                 } catch is CancellationError {
-                    print("⚠️ Results cancelled, using current transcription")
+                    print("⚠️ Results cancelled")
                 } catch {
                     print("❌ Results error: \(error)")
                 }
             }
             
-            // Step 6: Perform analysis
-            print("🎤 Started listening with SpeechAnalyzer...")
-            do {
-                let lastSampleTime = try await analyzer.analyzeSequence(inputSequence)
-                
-                // Step 8: Finish analysis
-                if let lastSampleTime {
-                    try await analyzer.finalizeAndFinish(through: lastSampleTime)
-                } else {
-                    try await analyzer.cancelAndFinishNow()
-                }
-                
-                // Wait for results to complete
-                await resultsTask?.value
-                
-                self.isListening = false
-                print("✅ Final transcription: \(self.currentTranscription)")
-                completion(.success(self.currentTranscription))
-            } catch is CancellationError {
-                // Manual stop - return current transcription
-                await resultsTask?.value
-                self.isListening = false
-                print("✅ Stopped manually, returning: \(self.currentTranscription)")
-                completion(.success(self.currentTranscription))
-            }
+            // Step 8: Supply audio to analyzer
+            self.supplyAudio(to: inputBuilder)
+            
+            print("🎤 Started listening...")
+            
+            // Wait for results
+            await resultsTask?.value
+            
+            self.isListening = false
+            print("✅ Final transcription: \(self.currentTranscription)")
+            completion(.success(self.currentTranscription))
             
         } catch {
             print("❌ Transcription error: \(error)")
@@ -222,43 +202,18 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     }
     
     /// Supply audio buffers to the analyzer
-    /// Always install the tap using the input node’s native format to avoid format mismatch.
+    /// Always install the tap using the input node's native format to avoid format mismatch.
     @MainActor
     private func supplyAudio(to inputBuilder: AsyncStream<AnalyzerInput>.Continuation) {
         let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0) // e.g., 48kHz Float32 mono
-        
-        // Prepare converter if analyzer prefers a different format
-        if let desired = desiredAnalyzerFormat, desired != inputFormat {
-            bufferConverter = AVAudioConverter(from: inputFormat, to: desired)
-            if bufferConverter == nil {
-                print("⚠️ Could not create AVAudioConverter from \(inputFormat) to \(desired). Proceeding with input format.")
-            } else {
-                print("🔁 Using AVAudioConverter: \(inputFormat) -> \(desired)")
-            }
-        } else {
-            bufferConverter = nil
-        }
+        let inputFormat = inputNode.outputFormat(forBus: 0)
         
         // Install audio tap using the input node's native format
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
             Task { @MainActor in
-                if let converter = self.bufferConverter, let desired = self.desiredAnalyzerFormat {
-                    // Convert buffer to the analyzer’s desired format
-                    if let converted = self.convert(buffer: buffer, from: inputFormat, to: desired, using: converter) {
-                        let input = AnalyzerInput(buffer: converted)
-                        inputBuilder.yield(input)
-                    } else {
-                        // Fallback to original buffer if conversion fails
-                        let input = AnalyzerInput(buffer: buffer)
-                        inputBuilder.yield(input)
-                    }
-                } else {
-                    // No conversion needed
-                    let input = AnalyzerInput(buffer: buffer)
-                    inputBuilder.yield(input)
-                }
+                let input = AnalyzerInput(buffer: buffer)
+                inputBuilder.yield(input)
             }
         }
         
@@ -290,29 +245,6 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     }
     
     /// Convert an AVAudioPCMBuffer to a target format using AVAudioConverter
-    private func convert(buffer: AVAudioPCMBuffer, from: AVAudioFormat, to: AVAudioFormat, using converter: AVAudioConverter) -> AVAudioPCMBuffer? {
-        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: to, frameCapacity: buffer.frameCapacity) else { return nil }
-        outputBuffer.frameLength = buffer.frameLength
-        
-        var error: NSError?
-        let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
-            outStatus.pointee = .haveData
-            return buffer
-        }
-        
-        let status = converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
-        switch status {
-        case .haveData, .inputRanDry, .endOfStream:
-            return outputBuffer
-        case .error:
-            if let error {
-                print("❌ AVAudioConverter error: \(error)")
-            }
-            return nil
-        @unknown default:
-            return outputBuffer
-        }
-    }
     
     /// Stop listening and return final transcription
     func stopListening() {

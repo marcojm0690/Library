@@ -1,9 +1,16 @@
 import SwiftUI
+enum BookSortOption: String, CaseIterable {
+    case title = "Nombre"
+    case author = "Autor"
+    case year = "Año"
+}
+
 struct LibraryDetailView: View {
     let library: LibraryModel
     @StateObject private var viewModel: LibraryDetailViewModel
     @State private var showVoiceSearch = false
     @State private var showAddMenu = false
+    @State private var sortOption: BookSortOption = .title
     
     init(library: LibraryModel) {
         self.library = library
@@ -25,6 +32,23 @@ struct LibraryDetailView: View {
         .navigationTitle(library.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Menu {
+                    ForEach(BookSortOption.allCases, id: \.self) { option in
+                        Button(action: { sortOption = option }) {
+                            HStack {
+                                Text(option.rawValue)
+                                if sortOption == option {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Ordenar", systemImage: "arrow.up.arrow.down")
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(action: { showVoiceSearch = true }) {
@@ -128,10 +152,27 @@ struct LibraryDetailView: View {
         }
         .padding()
     }
-    
-    var booksList: some View {
+        var sortedBooks: [Book] {
+        switch sortOption {
+        case .title:
+            return viewModel.books.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .author:
+            return viewModel.books.sorted { book1, book2 in
+                let author1 = book1.authors.first ?? ""
+                let author2 = book2.authors.first ?? ""
+                return author1.localizedCaseInsensitiveCompare(author2) == .orderedAscending
+            }
+        case .year:
+            return viewModel.books.sorted { book1, book2 in
+                let year1 = book1.publishedDate ?? ""
+                let year2 = book2.publishedDate ?? ""
+                return year1.compare(year2) == .orderedDescending
+            }
+        }
+    }
+        var booksList: some View {
         List {
-            ForEach(viewModel.books) { book in
+            ForEach(sortedBooks) { book in
                 NavigationLink(destination: BookDetailView(book: book, library: library)) {
                     LibraryBookRowView(book: book)
                 }
