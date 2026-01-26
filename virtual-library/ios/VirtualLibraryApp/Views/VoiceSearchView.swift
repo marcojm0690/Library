@@ -6,12 +6,14 @@ struct VoiceSearchView: View {
     let libraryId: UUID
     let onBookAdded: (() -> Void)?
     
-    @StateObject private var viewModel = VoiceSearchViewModel()
+    @StateObject private var viewModel: VoiceSearchViewModel
+    @EnvironmentObject private var authService: AuthenticationService
     @Environment(\.dismiss) private var dismiss
     
-    init(libraryId: UUID, onBookAdded: (() -> Void)? = nil) {
+    init(libraryId: UUID, userId: String? = nil, onBookAdded: (() -> Void)? = nil) {
         self.libraryId = libraryId
         self.onBookAdded = onBookAdded
+        _viewModel = StateObject(wrappedValue: VoiceSearchViewModel(userId: userId))
     }
     
     var body: some View {

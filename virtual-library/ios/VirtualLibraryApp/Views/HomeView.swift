@@ -168,9 +168,10 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showVoiceSearch) {
                 if let library = librariesViewModel.libraries.first {
-                    VoiceSearchView(libraryId: library.id) {
+                    VoiceSearchView(libraryId: library.id, userId: authService.user?.id) {
                         // Refresh if needed
                     }
+                    .environmentObject(authService)
                 }
             }
             .task {

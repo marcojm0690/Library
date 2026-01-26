@@ -461,6 +461,135 @@ public class LibrariesController : ControllerBase
     }
 
     /// <summary>
+    /// Get vocabulary hints for speech recognition based on user's libraries
+    /// Returns authors, titles, and common book-related terms to improve transcription accuracy
+    /// </summary>
+    [HttpGet("owner/{owner}/vocabulary-hints")]
+    [ProducesResponseType(typeof(VocabularyHintsResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<VocabularyHintsResponse>> GetVocabularyHints(string owner)
+    {
+        _logger.LogInformation("Fetching vocabulary hints for owner {Owner}", owner);
+        
+        var cacheKey = $"vocabulary:owner:{owner}";
+        
+        // Check cache first (longer TTL since library content doesn't change that often)
+        var cachedHints = await _cache.GetAsync<VocabularyHintsResponse>(cacheKey);
+        if (cachedHints != null)
+        {
+            _logger.LogInformation("Cache hit for vocabulary hints for owner {Owner}", owner);
+            return Ok(cachedHints);
+        }
+        
+        // Get user's libraries
+        var libraries = await _libraryRepository.GetByOwnerAsync(owner);
+        var libraryList = libraries.ToList();
+        
+        var hints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        // If user has libraries with tags, use tag-based vocabulary
+        var tags = libraryList.SelectMany(l => l.Tags).Distinct().ToList();
+        
+        if (tags.Any())
+        {
+            _logger.LogInformation("Found {TagCount} tags in user's libraries", tags.Count);
+            
+            // Add tags themselves as hints
+            foreach (var tag in tags)
+            {
+                hints.Add(tag);
+            }
+        }
+        
+        // Get books from all user's libraries
+        var allBookIds = libraryList.SelectMany(l => l.BookIds).Distinct().ToList();
+        
+        if (allBookIds.Any())
+        {
+            _logger.LogInformation("Fetching {BookCount} books from user's libraries", allBookIds.Count);
+            
+            foreach (var bookId in allBookIds)
+            {
+                var book = await _bookRepository.GetByIdAsync(bookId);
+                if (book == null) continue;
+                
+                // Add all authors
+                foreach (var author in book.Authors)
+                {
+                    if (!string.IsNullOrWhiteSpace(author))
+                    {
+                        hints.Add(author);
+                        
+                        // Also add individual name parts for better recognition
+                        var nameParts = author.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var part in nameParts)
+                        {
+                            if (part.Length > 2) // Skip very short parts
+                            {
+                                hints.Add(part);
+                            }
+                        }
+                    }
+                }
+                
+                // Add title
+                if (!string.IsNullOrWhiteSpace(book.Title))
+                {
+                    hints.Add(book.Title);
+                }
+                
+                // Add publisher if available
+                if (!string.IsNullOrWhiteSpace(book.Publisher))
+                {
+                    hints.Add(book.Publisher);
+                }
+            }
+        }
+        
+        // If no personalized vocabulary, add common literary terms
+        if (!hints.Any())
+        {
+            _logger.LogInformation("No library data found, using general book vocabulary");
+            hints.UnionWith(GetGeneralBookVocabulary());
+        }
+        
+        var response = new VocabularyHintsResponse
+        {
+            Hints = hints.OrderBy(h => h).ToList(),
+            Tags = tags,
+            BookCount = allBookIds.Count,
+            IsPersonalized = allBookIds.Any()
+        };
+        
+        // Cache for 10 minutes
+        await _cache.SetAsync(cacheKey, response, TimeSpan.FromMinutes(10));
+        
+        _logger.LogInformation("Returning {HintCount} vocabulary hints for owner {Owner}", response.Hints.Count, owner);
+        
+        return Ok(response);
+    }
+    
+    /// <summary>
+    /// Get general book-related vocabulary for users without personalized libraries
+    /// </summary>
+    private static List<string> GetGeneralBookVocabulary() => new()
+    {
+        // Common search terms
+        "book", "books", "author", "title", "fiction", "nonfiction", "novel",
+        "by", "written", "published", "publisher", "edition",
+        
+        // Genres
+        "fantasy", "science fiction", "mystery", "thriller", "romance",
+        "biography", "autobiography", "history", "philosophy", "poetry",
+        "drama", "comedy", "horror", "adventure", "classic",
+        
+        // Common classic authors (to help with pronunciation)
+        "Shakespeare", "Austen", "Dickens", "Tolstoy", "Dostoevsky",
+        "Hemingway", "Fitzgerald", "Orwell", "Kafka", "Kant",
+        "Nietzsche", "Plato", "Aristotle", "Homer", "Dante",
+        "Cervantes", "Joyce", "Proust", "Woolf", "Faulkner"
+    };
+    
+    /// <summary>
     /// Invalidate library cache when data changes
     /// </summary>
     private async Task InvalidateLibraryCache(Guid libraryId, string owner)
@@ -470,6 +599,9 @@ public class LibrariesController : ControllerBase
         
         // Remove owner's libraries cache
         await _cache.RemoveAsync($"libraries:owner:{owner}");
+        
+        // Remove vocabulary cache since library content changed
+        await _cache.RemoveAsync($"vocabulary:owner:{owner}");
         
         _logger.LogInformation("Invalidated cache for library {LibraryId} and owner {Owner}", libraryId, owner);
     }

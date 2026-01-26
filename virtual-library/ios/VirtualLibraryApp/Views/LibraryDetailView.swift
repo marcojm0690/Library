@@ -69,11 +69,12 @@ struct LibraryDetailView: View {
             }
         }
         .sheet(isPresented: $showVoiceSearch) {
-            VoiceSearchView(libraryId: library.id) {
+            VoiceSearchView(libraryId: library.id, userId: authService.user?.id) {
                 Task {
                     await viewModel.refresh()
                 }
             }
+            .environmentObject(authService)
         }
         .task {
             await viewModel.loadBooks()
@@ -152,25 +153,35 @@ struct LibraryDetailView: View {
         }
         .padding()
     }
-        var sortedBooks: [Book] {
+    
+    var sortedBooks: [Book] {
         switch sortOption {
         case .title:
             return viewModel.books.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         case .author:
-            return viewModel.books.sorted { book1, book2 in
+            return viewModel.books.sorted { (book1: Book, book2: Book) in
                 let author1 = book1.authors.first ?? ""
                 let author2 = book2.authors.first ?? ""
                 return author1.localizedCaseInsensitiveCompare(author2) == .orderedAscending
             }
         case .year:
-            return viewModel.books.sorted { book1, book2 in
-                let year1 = book1.publishedDate ?? ""
-                let year2 = book2.publishedDate ?? ""
-                return year1.compare(year2) == .orderedDescending
+            // Sort by publishYear descending (newest first), nils last
+            return viewModel.books.sorted { (book1: Book, book2: Book) in
+                switch (book1.publishYear, book2.publishYear) {
+                case let (y1?, y2?):
+                    return y1 > y2
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                case (nil, nil):
+                    return false
+                }
             }
         }
     }
-        var booksList: some View {
+    
+    var booksList: some View {
         List {
             ForEach(sortedBooks) { book in
                 NavigationLink(destination: BookDetailView(book: book, library: library)) {

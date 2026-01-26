@@ -363,6 +363,38 @@ class BookApiService: ObservableObject {
         }
     }
     
+    /// Get vocabulary hints for speech recognition based on user's library content
+    func getVocabularyHints(forOwner owner: String) async throws -> VocabularyHintsResponse {
+        let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner
+        let url = URL(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)/vocabulary-hints")!
+        
+        print("📚 Fetching vocabulary hints for owner: \(owner)")
+        print("📚 Request URL: \(url.absoluteString)")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid response type")
+                throw APIError.invalidResponse
+            }
+            
+            print("📚 Response status: \(httpResponse.statusCode)")
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                print("❌ HTTP error: \(httpResponse.statusCode)")
+                throw APIError.invalidResponse
+            }
+            
+            let hints = try JSONDecoder().decode(VocabularyHintsResponse.self, from: data)
+            print("✅ Received \(hints.hints.count) vocabulary hints (personalized: \(hints.isPersonalized))")
+            return hints
+        } catch {
+            print("❌ Error fetching vocabulary hints: \(error)")
+            throw error
+        }
+    }
+    
     /// Get books in a library
     func getBooksInLibrary(libraryId: UUID) async throws -> [Book] {
         let url = URL(string: "\(baseURL)/api/libraries/\(libraryId.uuidString)/books")!

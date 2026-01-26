@@ -43,3 +43,18 @@ struct UpdateLibraryRequest: Codable {
     let tags: [String]?
     let isPublic: Bool?
 }
+
+/// Response model for vocabulary hints used in speech recognition
+struct VocabularyHintsResponse: Codable {
+    /// List of vocabulary hints (authors, titles, publishers, etc.)
+    let hints: [String]
+    
+    /// Tags from the user's libraries
+    let tags: [String]
+    
+    /// Total number of books in user's libraries
+    let bookCount: Int
+    
+    /// Whether the hints are personalized based on user's library or general
+    let isPersonalized: Bool
+}

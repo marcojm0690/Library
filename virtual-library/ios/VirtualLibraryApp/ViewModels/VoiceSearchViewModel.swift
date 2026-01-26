@@ -31,6 +31,10 @@ class VoiceSearchViewModel: ObservableObject {
     @Published var transcribedText: String = ""
     @Published var selectedBook: Book?
     
+    // MARK: - Properties
+    
+    var userId: String?
+    
     // MARK: - Dependencies
     
     let speechService: SpeechRecognitionService
@@ -39,9 +43,11 @@ class VoiceSearchViewModel: ObservableObject {
     // MARK: - Initialization
     
     init(
+        userId: String? = nil,
         speechService: SpeechRecognitionService? = nil,
         apiService: BookApiService? = nil
     ) {
+        self.userId = userId
         // Construct defaults on the main actor to avoid calling actor-isolated initializers
         // from a nonisolated default parameter context.
         self.speechService = speechService ?? SpeechRecognitionService()
@@ -61,10 +67,11 @@ class VoiceSearchViewModel: ObservableObject {
         transcribedText = ""
         searchState = .listening
         
-        // Fetch library data to provide dynamic vocabulary hints
         Task {
-            
             print("🎤 Starting voice search...")
+            
+            // Load vocabulary hints before starting speech recognition
+            await loadVocabularyHints()
             
             // Start listening with timeout
             speechService.startListening { [weak self] result in
@@ -89,6 +96,35 @@ class VoiceSearchViewModel: ObservableObject {
                     }
                 }
             }
+        }
+    }
+    
+    /// Load vocabulary hints from the user's library to improve speech recognition
+    private func loadVocabularyHints() async {
+        // Get user ID from property or fallback to UserDefaults
+        let userId = self.userId ?? UserDefaults.standard.string(forKey: "currentUserId")
+        
+        guard let userId = userId else {
+            print("⚠️ No user ID found, using default vocabulary")
+            return
+        }
+        
+        do {
+            let hints = try await apiService.getVocabularyHints(forOwner: userId)
+            
+            print("📚 Loaded \(hints.hints.count) vocabulary hints")
+            print("📚 Personalized: \(hints.isPersonalized)")
+            print("📚 Sample hints: \(hints.hints.prefix(10).joined(separator: ", "))")
+            
+            // Update speech service vocabulary hints
+            await MainActor.run {
+                speechService.vocabularyHints = hints.hints
+            }
+            
+        } catch {
+            print("⚠️ Failed to load vocabulary hints: \(error)")
+            print("⚠️ Continuing without personalized vocabulary")
+            // Continue without vocabulary hints - it's not critical
         }
     }
     

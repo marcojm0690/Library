@@ -23,11 +23,9 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     
     // MARK: - Private Properties
     
-    private var analyzer: SpeechAnalyzer?
-    private var transcriber: SpeechTranscriber?
-    private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
-    private var analysisTask: Task<Void, Never>?
-    private var resultsTask: Task<Void, Never>?
+    private let speechRecognizer: SFSpeechRecognizer?
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
     private var currentTranscription = ""
     private var timeoutTask: Task<Void, Never>?
     private let audioEngine = AVAudioEngine()
@@ -38,6 +36,7 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     // MARK: - Initialization
     
     override init() {
+        self.speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
         super.init()
         
         // Request authorization on init
@@ -79,15 +78,28 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     
     // MARK: - Recording Control
     
-    /// Start listening and transcribing speech using modern SpeechAnalyzer API
+    /// Start listening and transcribing speech
     /// - Parameter completion: Called when user stops speaking or timeout occurs
     func startListening(completion: @escaping (Result<String, Error>) -> Void) {
+        print("\n🎤🎤🎤 START LISTENING CALLED 🎤🎤🎤")
+        
         // Check authorization
         guard authorizationStatus == .authorized else {
             let error = NSError(
                 domain: "SpeechRecognition",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "Speech recognition not authorized"]
+            )
+            completion(.failure(error))
+            return
+        }
+        
+        // Check if recognizer is available
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            let error = NSError(
+                domain: "SpeechRecognition",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Speech recognizer not available"]
             )
             completion(.failure(error))
             return
@@ -109,121 +121,81 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         
         // Clear previous transcription
         self.transcribedText = ""
+        self.currentTranscription = ""
         self.errorMessage = nil
         self.isListening = true
         
-        // Start transcription with new API
-        analysisTask = Task { @MainActor in
-            await self.performTranscription(completion: completion)
-        }
-    }
-    
-    /// Perform transcription using SpeechTranscriber directly (iOS 26+)
-    @MainActor
-    private func performTranscription(completion: @escaping (Result<String, Error>) -> Void) async {
-        do {
-            // Step 1: Get supported locale
-            guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
-                throw NSError(
-                    domain: "SpeechRecognition",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "Locale not supported for transcription"]
-                )
-            }
-            
-            // Step 2: Create transcriber with vocabulary hints
-            let transcriber = SpeechTranscriber(
-                locale: locale,
-                preset: .timeIndexedProgressiveTranscription
+        // Create recognition request
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else {
+            let error = NSError(
+                domain: "SpeechRecognition",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"]
             )
-            
-            self.transcriber = transcriber
-            
-            // Step 3: Check and download assets if needed
-            if let installationRequest = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                try await installationRequest.downloadAndInstall()
-            }
-            
-            // Step 4: Create input sequence for analyzer
-            let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
-            self.inputContinuation = inputBuilder
-            
-            // Step 5: Create analyzer with transcriber module
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
-            self.analyzer = analyzer
-            
-            // Step 6: Start analysis task - feed inputs to analyzer by analyzing the sequence
-            analysisTask = Task {
-                await analyzer.analyze(on: inputSequence)
-                print("🎤 Input sequence finished")
-            }
-            
-            // Step 7: Process results
-            self.currentTranscription = ""
-            var lastUpdateTime = Date()
-            
-            resultsTask = Task { @MainActor in
-                do {
-                    for try await result in transcriber.results {
-                        let transcription = String(result.text.characters)
-                        self.transcribedText = transcription
-                        self.currentTranscription = transcription
-                        print("🎤 Transcription: \(transcription)")
-                        
-                        // Reset timeout on each update
-                        self.timeoutTask?.cancel()
-                        self.startSilenceTimeout()
-                    }
-                } catch is CancellationError {
-                    print("⚠️ Results cancelled")
-                } catch {
-                    print("❌ Results error: \(error)")
-                }
-            }
-            
-            // Step 8: Supply audio to analyzer
-            self.supplyAudio(to: inputBuilder)
-            
-            print("🎤 Started listening...")
-            
-            // Wait for results
-            await resultsTask?.value
-            
-            self.isListening = false
-            print("✅ Final transcription: \(self.currentTranscription)")
-            completion(.success(self.currentTranscription))
-            
-        } catch {
-            print("❌ Transcription error: \(error)")
-            self.isListening = false
-            self.errorMessage = error.localizedDescription
             completion(.failure(error))
+            return
         }
-    }
-    
-    /// Supply audio buffers to the analyzer
-    /// Always install the tap using the input node's native format to avoid format mismatch.
-    @MainActor
-    private func supplyAudio(to inputBuilder: AsyncStream<AnalyzerInput>.Continuation) {
-        let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
         
-        // Install audio tap using the input node's native format
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-            guard let self else { return }
-            Task { @MainActor in
-                let input = AnalyzerInput(buffer: buffer)
-                inputBuilder.yield(input)
+        recognitionRequest.shouldReportPartialResults = true
+        
+        // Add vocabulary hints if available
+        if !vocabularyHints.isEmpty {
+            recognitionRequest.contextualStrings = vocabularyHints
+            print("📚 Added vocabulary hints: \(vocabularyHints)")
+        }
+        
+        // Start recognition task
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            var isFinal = false
+            
+            if let result = result {
+                let transcription = result.bestTranscription.formattedString
+                
+                Task { @MainActor in
+                    print("\n🗣️ SPEECH: '\(transcription)' (final: \(result.isFinal))")
+                    self.transcribedText = transcription
+                    self.currentTranscription = transcription
+                    
+                    // Reset timeout on each update
+                    self.timeoutTask?.cancel()
+                    self.startSilenceTimeout()
+                }
+                
+                isFinal = result.isFinal
+            }
+            
+            if error != nil || isFinal {
+                Task { @MainActor in
+                    self.stopListening()
+                    if let error = error {
+                        print("❌ Recognition error: \(error)")
+                        completion(.failure(error))
+                    } else {
+                        print("✅ Final transcription: \(self.currentTranscription)")
+                        completion(.success(self.currentTranscription))
+                    }
+                }
             }
         }
         
         // Start audio engine
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
+        }
+        
         audioEngine.prepare()
         do {
             try audioEngine.start()
+            print("✅ Audio engine started, listening for speech...")
         } catch {
             print("❌ Audio engine error: \(error)")
-            inputBuilder.finish()
+            completion(.failure(error))
         }
     }
     
@@ -244,28 +216,24 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         }
     }
     
-    /// Convert an AVAudioPCMBuffer to a target format using AVAudioConverter
-    
     /// Stop listening and return final transcription
     func stopListening() {
         // Cancel timeout
         timeoutTask?.cancel()
         timeoutTask = nil
         
-        // Stop audio engine first
+        // Stop audio engine
         if audioEngine.isRunning {
             audioEngine.stop()
             audioEngine.inputNode.removeTap(onBus: 0)
-            print("🛑 Stopped listening")
         }
         
-        // Finish audio input to signal end
-        inputContinuation?.finish()
-        inputContinuation = nil
+        // End recognition request
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
         
-        // Let the analyzer finish gracefully by cancelling the task
-        // This will trigger the CancellationError handling which returns current transcription
-        analysisTask?.cancel()
+        self.isListening = false
+        print("🛑 Stopped listening")
     }
     
     /// Cancel current recognition task
@@ -274,15 +242,10 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         timeoutTask?.cancel()
         timeoutTask = nil
         
-        // Finish input
-        inputContinuation?.finish()
-        inputContinuation = nil
-        
-        // Cancel all tasks
-        analysisTask?.cancel()
-        resultsTask?.cancel()
-        analysisTask = nil
-        resultsTask = nil
+        // Cancel recognition task
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
         
         // Stop audio engine
         if audioEngine.isRunning {
@@ -292,6 +255,7 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         
         self.isListening = false
         self.transcribedText = ""
+        self.currentTranscription = ""
         self.errorMessage = nil
         
         print("❌ Cancelled listening")

@@ -47,3 +47,29 @@ public record AddBooksToLibraryRequest
 {
     public List<Guid> BookIds { get; init; } = new();
 }
+
+/// <summary>
+/// Response DTO for vocabulary hints used in speech recognition
+/// </summary>
+public record VocabularyHintsResponse
+{
+    /// <summary>
+    /// List of vocabulary hints (authors, titles, publishers, etc.)
+    /// </summary>
+    public List<string> Hints { get; init; } = new();
+    
+    /// <summary>
+    /// Tags from the user's libraries
+    /// </summary>
+    public List<string> Tags { get; init; } = new();
+    
+    /// <summary>
+    /// Total number of books in user's libraries
+    /// </summary>
+    public int BookCount { get; init; }
+    
+    /// <summary>
+    /// Whether the hints are personalized based on user's library or general
+    /// </summary>
+    public bool IsPersonalized { get; init; }
+}
