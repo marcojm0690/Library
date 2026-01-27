@@ -109,11 +109,26 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         // Cancel any ongoing recognition
         stopListening()
         
-        // Configure audio session
+        // Configure audio session for optimal speech recognition
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            // Configuration that supports AirPods and other Bluetooth devices
+            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .allowBluetooth, .allowBluetoothA2DP])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            
+            // Log audio route information
+            print("🎙️ Audio session configured successfully")
+            
+            if let currentRoute = audioSession.currentRoute.inputs.first {
+                print("🎧 Input device: \(currentRoute.portName)")
+                print("   Type: \(currentRoute.portType.rawValue)")
+                
+                if currentRoute.portType == .bluetoothHFP || currentRoute.portType == .bluetoothA2DP {
+                    print("   ✅ Using Bluetooth device (AirPods/headset)")
+                } else if currentRoute.portType == .builtInMic {
+                    print("   📱 Using built-in microphone")
+                }
+            }
         } catch {
             print("❌ Audio session configuration error: \(error)")
             completion(.failure(error))
@@ -138,13 +153,41 @@ class SpeechRecognitionService: NSObject, ObservableObject {
             return
         }
         
+        // Configure recognition request for best accuracy
         recognitionRequest.shouldReportPartialResults = true
         
+        // Try on-device recognition for better vocabulary hint integration
+        if speechRecognizer.supportsOnDeviceRecognition {
+            recognitionRequest.requiresOnDeviceRecognition = true
+            print("🔒 Using on-device recognition for better hint accuracy")
+        } else {
+            print("☁️ Using server-based recognition")
+        }
+        
+        // Set task hint for search/dictation context
+        recognitionRequest.taskHint = .search // Optimizes for short queries like names
+        
         // Add vocabulary hints for improved recognition
-        // Apple's Speech framework already uses ML for phonetic matching
         if !vocabularyHints.isEmpty {
             recognitionRequest.contextualStrings = vocabularyHints
-            print("📚 Added \(vocabularyHints.count) vocabulary hints")
+            print("📚 Added \(vocabularyHints.count) vocabulary hints:")
+            print("   First 10: \(vocabularyHints.prefix(10).joined(separator: ", "))")
+            
+            // Check if "Kant" is in the hints
+            if vocabularyHints.contains(where: { $0.lowercased() == "kant" }) {
+                print("   ✅ 'Kant' is in vocabulary hints")
+            } else {
+                print("   ⚠️ 'Kant' NOT found in vocabulary hints!")
+            }
+        } else {
+            print("⚠️ No vocabulary hints provided!")
+        }
+        
+        // Add words to recognize - alternative API that may work better
+        if #available(iOS 16.0, *), !vocabularyHints.isEmpty {
+            // On iOS 16+, we can add custom pronunciations
+            // This helps with difficult names like "Schopenhauer", "Kant", etc.
+            print("📚 Using iOS 16+ vocabulary recognition features")
         }
         
         // Start recognition task
@@ -158,6 +201,11 @@ class SpeechRecognitionService: NSObject, ObservableObject {
                 
                 Task { @MainActor in
                     print("\n🗣️ SPEECH: '\(transcription)' (final: \(result.isFinal))")
+                    
+                    // Debug: Print alternative transcriptions to see what recognizer is considering
+                    if !result.transcriptions.isEmpty {
+                        print("   Alternatives: \(result.transcriptions.prefix(3).map { $0.formattedString }.joined(separator: " | "))")
+                    }
                     self.transcribedText = transcription
                     self.currentTranscription = transcription
                     

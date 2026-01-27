@@ -87,6 +87,9 @@ builder.Services.AddHttpClient<InventaireBookProvider>();
 builder.Services.AddHttpClient<GoogleBooksProvider>();
 builder.Services.AddHttpClient<OpenLibraryProvider>();
 
+// Register Azure Translator service
+builder.Services.AddHttpClient<ITranslatorService, AzureTranslatorService>();
+
 // Register as IBookProvider implementations in priority order
 // builder.Services.AddScoped<IBookProvider, ISBNdbBookProvider>();
 builder.Services.AddScoped<IBookProvider, WikidataBookProvider>();

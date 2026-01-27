@@ -19,6 +19,7 @@ public class LibrariesController : ControllerBase
     private readonly RedisCacheService _cache;
     private readonly GoogleBooksProvider _googleBooksProvider;
     private readonly OpenLibraryProvider _openLibraryProvider;
+    private readonly ITranslatorService _translatorService;
     private readonly ILogger<LibrariesController> _logger;
 
     public LibrariesController(
@@ -27,6 +28,7 @@ public class LibrariesController : ControllerBase
         RedisCacheService cache,
         GoogleBooksProvider googleBooksProvider,
         OpenLibraryProvider openLibraryProvider,
+        ITranslatorService translatorService,
         ILogger<LibrariesController> logger)
     {
         _libraryRepository = libraryRepository;
@@ -34,6 +36,7 @@ public class LibrariesController : ControllerBase
         _cache = cache;
         _googleBooksProvider = googleBooksProvider;
         _openLibraryProvider = openLibraryProvider;
+        _translatorService = translatorService;
         _logger = logger;
     }
 
@@ -762,12 +765,23 @@ public class LibrariesController : ControllerBase
         try
         {
             // Search for books in each tag category to get related terms
-            foreach (var tag in tags.Take(5)) // Process up to 5 tags
+            foreach (var originalTag in tags.Take(5)) // Process up to 5 tags
             {
-                _logger.LogInformation("Enriching vocabulary with tag: {Tag}", tag);
+                // Translate tag to English for better API search results
+                var searchTag = await _translatorService.TranslateToEnglishAsync(originalTag);
+                
+                if (searchTag != originalTag)
+                {
+                    _logger.LogInformation("Translated tag '{OriginalTag}' to '{TranslatedTag}' for API search", 
+                        originalTag, searchTag);
+                }
+                else
+                {
+                    _logger.LogInformation("Using original tag '{Tag}' for API search", originalTag);
+                }
                 
                 // Search Google Books for this tag/genre
-                var googleBooks = await _googleBooksProvider.SearchByTextAsync(tag);
+                var googleBooks = await _googleBooksProvider.SearchByTextAsync(searchTag);
                 
                 foreach (var book in googleBooks.Take(10)) // Take first 10 results for more vocabulary
                 {
@@ -820,7 +834,7 @@ public class LibrariesController : ControllerBase
                 }
                 
                 // Also search Open Library for the tag
-                var openLibraryBooks = await _openLibraryProvider.SearchByTextAsync(tag);
+                var openLibraryBooks = await _openLibraryProvider.SearchByTextAsync(searchTag);
                 
                 foreach (var book in openLibraryBooks.Take(10))
                 {
@@ -841,7 +855,10 @@ public class LibrariesController : ControllerBase
                 }
                 
                 _logger.LogInformation("Added vocabulary from {GoogleCount} Google Books and {OpenLibraryCount} Open Library books for tag '{Tag}'", 
-                    googleBooks.Count, openLibraryBooks.Count, tag);
+                    googleBooks.Count, openLibraryBooks.Count, searchTag);
+                
+                // Add domain-specific vocabulary for certain tags
+                AddDomainSpecificVocabulary(searchTag, hints);
             }
         }
         catch (Exception ex)
@@ -849,6 +866,52 @@ public class LibrariesController : ControllerBase
             _logger.LogWarning(ex, "Failed to enrich vocabulary from tags");
             // Continue without enrichment - not critical
         }
+    }
+    
+    /// <summary>
+    /// Add well-known authors and works for specific academic domains
+    /// </summary>
+    private void AddDomainSpecificVocabulary(string tag, HashSet<string> hints)
+    {
+        var tagLower = tag.ToLower();
+        
+        // Philosophy and Ethics - canonical philosophers
+        if (tagLower.Contains("philos") || tagLower.Contains("ethic"))
+        {
+            var philosophers = new[]
+            {
+                "Kant", "Immanuel Kant",
+                "Aristotle",
+                "Plato", "Socrates",
+                "Nietzsche", "Friedrich Nietzsche",
+                "Hegel", "Georg Hegel",
+                "Descartes", "René Descartes",
+                "Spinoza", "Baruch Spinoza",
+                "Hume", "David Hume",
+                "Locke", "John Locke",
+                "Mill", "John Stuart Mill",
+                "Kierkegaard", "Søren Kierkegaard",
+                "Schopenhauer", "Arthur Schopenhauer",
+                "Heidegger", "Martin Heidegger",
+                "Sartre", "Jean-Paul Sartre",
+                "Wittgenstein", "Ludwig Wittgenstein",
+                "Aquinas", "Thomas Aquinas",
+                "Rousseau", "Jean-Jacques Rousseau",
+                "Hobbes", "Thomas Hobbes",
+                "Marx", "Karl Marx",
+                "Foucault", "Michel Foucault",
+                "Derrida", "Jacques Derrida"
+            };
+            
+            foreach (var philosopher in philosophers)
+            {
+                hints.Add(philosopher);
+            }
+            
+            _logger.LogInformation("Added {Count} philosophy-specific vocabulary terms", philosophers.Length);
+        }
+        
+        // Add more domains as needed (science, history, etc.)
     }
     
     /// <summary>

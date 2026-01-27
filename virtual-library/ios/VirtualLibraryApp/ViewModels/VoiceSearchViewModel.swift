@@ -40,6 +40,9 @@ class VoiceSearchViewModel: ObservableObject {
     let speechService: SpeechRecognitionService
     private let apiService: BookApiService
     
+    // Current vocabulary hints
+    private var currentVocabularyHints: [String] = []
+    
     // MARK: - Initialization
     
     init(
@@ -134,10 +137,25 @@ class VoiceSearchViewModel: ObservableObject {
             print("📚 Personalized: \(hints.isPersonalized)")
             print("📚 Sample hints: \(hints.hints.prefix(10).joined(separator: ", "))")
             
+            // Check for specific author
+            if hints.hints.contains(where: { $0.lowercased().contains("kant") }) {
+                print("   ✅ Found 'Kant' in API response")
+            } else {
+                print("   ⚠️ 'Kant' NOT in API response - check backend")
+            }
+            
+            // Store hints
+            currentVocabularyHints = hints.hints
+            
+            // Prioritize author names (single and multi-word) and limit to most important hints
+            // Speech recognition works better with focused, high-quality hints (max 100-200)
+            let optimizedHints = optimizeHintsForSpeech(hints.hints)
+            
+            print("📚 Optimized to \(optimizedHints.count) high-priority hints for speech recognition")
+            
             // Set vocabulary hints using contextualStrings
-            // Apple's Speech framework already has ML-based phonetic matching built-in
             await MainActor.run {
-                speechService.vocabularyHints = hints.hints
+                speechService.vocabularyHints = optimizedHints
             }
             
             print("✅ Vocabulary hints loaded for improved recognition")
@@ -147,6 +165,29 @@ class VoiceSearchViewModel: ObservableObject {
             print("⚠️ Continuing without personalized vocabulary")
             // Continue without vocabulary hints - it's not critical
         }
+    }
+    
+    /// Optimize hints for speech recognition - prioritize likely search terms
+    private func optimizeHintsForSpeech(_ allHints: [String]) -> [String] {
+        var prioritized: [String] = []
+        var secondary: [String] = []
+        
+        for hint in allHints {
+            let wordCount = hint.split(separator: " ").count
+            
+            // Priority 1: Author names (1-3 words, likely names)
+            if wordCount >= 1 && wordCount <= 3 && hint.contains(where: { $0.isUppercase }) {
+                prioritized.append(hint)
+            }
+            // Priority 2: Short phrases (titles, subjects)
+            else if wordCount >= 1 && wordCount <= 4 {
+                secondary.append(hint)
+            }
+        }
+        
+        // Limit to top 100 prioritized + 50 secondary (Apple recommends keeping it small)
+        let result = Array(prioritized.prefix(100)) + Array(secondary.prefix(50))
+        return result
     }
     
     /// Stop listening manually

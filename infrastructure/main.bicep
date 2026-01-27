@@ -15,6 +15,7 @@ var vnetName = '${appName}-vnet'
 var cosmosDbName = 'LibraryDb'
 var cosmosDbCollection = 'Books'
 var redisName = '${appName}-redis-${environment}'
+var translatorName = '${appName}-translator-${environment}'
 
 // Create Virtual Network for private endpoints
 resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
@@ -155,6 +156,23 @@ resource redis 'Microsoft.Cache/redis@2024-11-01' = {
   }
 }
 
+// Create Azure AI Translator (Cognitive Services)
+resource translator 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+  name: translatorName
+  location: location
+  kind: 'TextTranslation'
+  sku: {
+    name: 'F0' // Free tier (2M chars/month)
+  }
+  properties: {
+    customSubDomainName: translatorName
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+    }
+  }
+}
+
 // Create App Service Plan
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   name: appServicePlanName
@@ -220,6 +238,18 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'Azure__Redis__CacheExpirationMinutes'
           value: '1440'
         }
+        {
+          name: 'Azure__Translator__Endpoint'
+          value: translator.properties.endpoint
+        }
+        {
+          name: 'Azure__Translator__Key'
+          value: translator.listKeys().key1
+        }
+        {
+          name: 'Azure__Translator__Region'
+          value: location
+        }
       ]
       connectionStrings: [
         {
@@ -259,3 +289,5 @@ output webAppName string = webApp.name
 output webAppPrincipalId string = webApp.identity.principalId
 output redisHostName string = redis.properties.hostName
 output redisName string = redis.name
+output translatorEndpoint string = translator.properties.endpoint
+output translatorName string = translator.name
