@@ -2,6 +2,7 @@ using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Application.Books.SearchByIsbn;
 using VirtualLibrary.Api.Application.Books.SearchByCover;
 using VirtualLibrary.Api.Application.Books.SearchByImage;
+using VirtualLibrary.Api.Infrastructure;
 using VirtualLibrary.Api.Infrastructure.External;
 using VirtualLibrary.Api.Infrastructure.Persistence;
 using VirtualLibrary.Api.Infrastructure.Cache;

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Application.DTOs;
 using VirtualLibrary.Api.Domain;
+using VirtualLibrary.Api.Infrastructure;
 using VirtualLibrary.Api.Infrastructure.Cache;
 using VirtualLibrary.Api.Infrastructure.External;
 
