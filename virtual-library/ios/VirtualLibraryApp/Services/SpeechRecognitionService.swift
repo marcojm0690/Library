@@ -39,6 +39,22 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         self.speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
         super.init()
         
+        // Log detailed info about speech recognizer setup
+        print("🎤 Initializing Speech Recognition Service")
+        print("   Locale: \(Locale.current.identifier)")
+        if #available(iOS 16, *) {
+            print("   Language: \(Locale.current.language.languageCode?.identifier ?? "unknown")")
+        } else {
+            print("   Language: \(Locale.current.languageCode ?? "unknown")")
+        }
+        print("   Region: \(Locale.current.region?.identifier ?? "unknown")")
+        if let recognizer = speechRecognizer {
+            print("   Recognizer available: \(recognizer.isAvailable)")
+            print("   Supports on-device: \(recognizer.supportsOnDeviceRecognition)")
+        } else {
+            print("   ⚠️ Speech recognizer is nil - locale may not be supported")
+        }
+        
         // Request authorization on init
         Task {
             await requestAuthorization()
@@ -83,13 +99,15 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     /// - Parameter completion: Called when user stops speaking or timeout occurs
     func startListening(completion: @escaping (Result<String, Error>) -> Void) {
         print("\n🎤🎤🎤 START LISTENING CALLED 🎤🎤🎤")
+        print("   Authorization status: \(authorizationStatus.rawValue)")
         
         // Check authorization
         guard authorizationStatus == .authorized else {
+            print("❌ Authorization failed: \(authorizationStatus)")
             let error = NSError(
                 domain: "SpeechRecognition",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Speech recognition not authorized"]
+                userInfo: [NSLocalizedDescriptionKey: "Speech recognition not authorized: \(authorizationStatus)"]
             )
             completion(.failure(error))
             return
@@ -97,10 +115,13 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         
         // Check if recognizer is available
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            print("❌ Speech recognizer not available")
+            print("   Recognizer exists: \(speechRecognizer != nil)")
+            print("   Is available: \(speechRecognizer?.isAvailable ?? false)")
             let error = NSError(
                 domain: "SpeechRecognition",
                 code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Speech recognizer not available"]
+                userInfo: [NSLocalizedDescriptionKey: "Speech recognizer not available. Check device language settings."]
             )
             completion(.failure(error))
             return
@@ -113,7 +134,7 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         let audioSession = AVAudioSession.sharedInstance()
         do {
             // Configuration that supports AirPods and other Bluetooth devices
-            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .allowBluetooth, .allowBluetoothA2DP])
+            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .allowBluetoothA2DP])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             
             // Log audio route information
@@ -206,15 +227,19 @@ class SpeechRecognitionService: NSObject, ObservableObject {
                     if !result.transcriptions.isEmpty {
                         print("   Alternatives: \(result.transcriptions.prefix(3).map { $0.formattedString }.joined(separator: " | "))")
                     }
-                    self.transcribedText = transcription
-                    self.currentTranscription = transcription
                     
-                    // Notify observers of transcription update
-                    NotificationCenter.default.post(name: .speechTranscriptionUpdated, object: transcription)
-                    
-                    // Reset timeout on each update
-                    self.timeoutTask?.cancel()
-                    self.startSilenceTimeout()
+                    // Only update if we have actual content (don't overwrite with empty final results)
+                    if !transcription.isEmpty {
+                        self.transcribedText = transcription
+                        self.currentTranscription = transcription
+                        
+                        // Notify observers of transcription update
+                        NotificationCenter.default.post(name: .speechTranscriptionUpdated, object: transcription)
+                        
+                        // Reset timeout on each update
+                        self.timeoutTask?.cancel()
+                        self.startSilenceTimeout()
+                    }
                 }
                 
                 isFinal = result.isFinal

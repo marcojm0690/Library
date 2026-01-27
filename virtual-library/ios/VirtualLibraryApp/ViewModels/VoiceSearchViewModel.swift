@@ -259,13 +259,16 @@ class VoiceSearchViewModel: ObservableObject {
             // Save the book to the database
             let savedBook = try await apiService.saveBook(book)
             
-            guard savedBook.id != nil else {
+            guard let bookId = savedBook.id else {
                 throw NSError(
                     domain: "VoiceSearch",
                     code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "Failed to save book - no ID returned"]
                 )
             }
+            
+            // Add the book to the library
+            try await apiService.addBooksToLibrary(libraryId: libraryId, bookIds: [bookId])
             
             print("✅ Book added successfully to library \(libraryId)")
             
