@@ -364,11 +364,20 @@ class BookApiService: ObservableObject {
     }
     
     /// Get vocabulary hints for speech recognition based on user's library content
-    func getVocabularyHints(forOwner owner: String) async throws -> VocabularyHintsResponse {
+    func getVocabularyHints(forOwner owner: String, booksOnly: Bool = false) async throws -> VocabularyHintsResponse {
         let encodedOwner = owner.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? owner
-        let url = URL(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)/vocabulary-hints")!
+        var urlComponents = URLComponents(string: "\(baseURL)/api/libraries/owner/\(encodedOwner)/vocabulary-hints")!
         
-        print("📚 Fetching vocabulary hints for owner: \(owner)")
+        // Add query parameter if booksOnly is true
+        if booksOnly {
+            urlComponents.queryItems = [URLQueryItem(name: "booksOnly", value: "true")]
+        }
+        
+        guard let url = urlComponents.url else {
+            throw APIError.invalidResponse
+        }
+        
+        print("📚 Fetching vocabulary hints for owner: \(owner) (booksOnly: \(booksOnly))")
         print("📚 Request URL: \(url.absoluteString)")
         
         do {

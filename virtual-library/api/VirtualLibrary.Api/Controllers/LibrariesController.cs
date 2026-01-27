@@ -478,11 +478,15 @@ public class LibrariesController : ControllerBase
     /// </summary>
     [HttpGet("owner/{owner}/vocabulary-hints")]
     [ProducesResponseType(typeof(VocabularyHintsResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<VocabularyHintsResponse>> GetVocabularyHints(string owner)
+    public async Task<ActionResult<VocabularyHintsResponse>> GetVocabularyHints(
+        string owner, 
+        [FromQuery] bool booksOnly = false)
     {
-        _logger.LogInformation("Fetching vocabulary hints for owner {Owner}", owner);
+        _logger.LogInformation("Fetching vocabulary hints for owner {Owner} (booksOnly: {BooksOnly})", owner, booksOnly);
         
-        var cacheKey = $"vocabulary:owner:{owner}";
+        var cacheKey = booksOnly 
+            ? $"vocabulary:owner:{owner}:booksonly" 
+            : $"vocabulary:owner:{owner}";
         
         // Check cache first (longer TTL since library content doesn't change that often)
         var cachedHints = await _cache.GetAsync<VocabularyHintsResponse>(cacheKey);
@@ -534,7 +538,7 @@ public class LibrariesController : ControllerBase
             _logger.LogInformation("Auto-generated {TagCount} tags: {Tags}", tags.Count, string.Join(", ", tags));
         }
         
-        if (tags.Any())
+        if (tags.Any() && !booksOnly)
         {
             _logger.LogInformation("Adding {TagCount} tags as vocabulary hints", tags.Count);
             
@@ -546,7 +550,7 @@ public class LibrariesController : ControllerBase
             
             // Enrich with genre-related terms from external APIs
             _logger.LogInformation("Enriching vocabulary from {TagCount} tags using external APIs", tags.Count);
-            await EnrichVocabularyFromTags(tags, hints);
+            await EnrichVocabularyFromTags(tags, hints, booksOnly);
         }
         
         // Add vocabulary from user's books
@@ -577,16 +581,19 @@ public class LibrariesController : ControllerBase
                 hints.Add(book.Title);
             }
             
-            // Add publisher if available
-            if (!string.IsNullOrWhiteSpace(book.Publisher))
+            if (!booksOnly)
             {
-                hints.Add(book.Publisher);
-            }
-            
-            // Enrich with related terms from external APIs based on ISBN
-            if (!string.IsNullOrWhiteSpace(book.Isbn))
-            {
-                await EnrichVocabularyFromBook(book.Isbn, hints);
+                // Add publisher if available
+                if (!string.IsNullOrWhiteSpace(book.Publisher))
+                {
+                    hints.Add(book.Publisher);
+                }
+                
+                // Enrich with related terms from external APIs based on ISBN
+                if (!string.IsNullOrWhiteSpace(book.Isbn))
+                {
+                    await EnrichVocabularyFromBook(book.Isbn, hints);
+                }
             }
         }
         
@@ -761,7 +768,7 @@ public class LibrariesController : ControllerBase
     /// <summary>
     /// Enrich vocabulary with subjects and categories from external APIs based on tags
     /// </summary>
-    private async Task EnrichVocabularyFromTags(List<string> tags, HashSet<string> hints)
+    private async Task EnrichVocabularyFromTags(List<string> tags, HashSet<string> hints, bool booksOnly = false)
     {
         try
         {
@@ -809,28 +816,34 @@ public class LibrariesController : ControllerBase
                     if (!string.IsNullOrWhiteSpace(book.Title))
                     {
                         hints.Add(book.Title);
-                        
+                    }
+                    
+                    if (!booksOnly)
+                    {
                         // Add significant words from titles (filter out common words)
-                        var titleWords = book.Title
+                        var titleWords = book.Title?
                             .Split(new[] { ' ', ':', '-', '—' }, StringSplitOptions.RemoveEmptyEntries)
                             .Where(w => w.Length > 4 && !IsCommonWord(w));
                         
-                        foreach (var word in titleWords)
+                        if (titleWords != null)
                         {
-                            hints.Add(word);
+                            foreach (var word in titleWords)
+                            {
+                                hints.Add(word);
+                            }
                         }
-                    }
-                    
-                    // Add publishers for genre context
-                    if (!string.IsNullOrWhiteSpace(book.Publisher))
-                    {
-                        hints.Add(book.Publisher);
-                    }
-                    
-                    // Extract genre-related terms from descriptions
-                    if (!string.IsNullOrWhiteSpace(book.Description))
-                    {
-                        ExtractKeywordsFromDescription(book.Description, hints);
+                        
+                        // Add publishers for genre context
+                        if (!string.IsNullOrWhiteSpace(book.Publisher))
+                        {
+                            hints.Add(book.Publisher);
+                        }
+                        
+                        // Extract genre-related terms from descriptions
+                        if (!string.IsNullOrWhiteSpace(book.Description))
+                        {
+                            ExtractKeywordsFromDescription(book.Description, hints);
+                        }
                     }
                 }
                 
@@ -858,7 +871,7 @@ public class LibrariesController : ControllerBase
                 _logger.LogInformation("Added vocabulary from {GoogleCount} Google Books and {OpenLibraryCount} Open Library books for tag '{Tag}'", 
                     googleBooks.Count, openLibraryBooks.Count, searchTag);
                 
-                // Add domain-specific vocabulary for certain tags
+                // Add domain-specific vocabulary for certain tags (always add famous authors)
                 AddDomainSpecificVocabulary(searchTag, hints);
             }
         }

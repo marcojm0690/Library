@@ -131,9 +131,9 @@ class VoiceSearchViewModel: ObservableObject {
         }
         
         do {
-            let hints = try await apiService.getVocabularyHints(forOwner: userId)
+            let hints = try await apiService.getVocabularyHints(forOwner: userId, booksOnly: true)
             
-            print("📚 Loaded \(hints.hints.count) vocabulary hints")
+            print("📚 Loaded \(hints.hints.count) vocabulary hints (books only)")
             print("📚 Personalized: \(hints.isPersonalized)")
             print("📚 Sample hints: \(hints.hints.prefix(10).joined(separator: ", "))")
             
