@@ -515,16 +515,24 @@ public class LibrariesController : ControllerBase
         // Get tags - either user-defined or auto-generated from book content
         var tags = libraryList.SelectMany(l => l.Tags).Distinct().ToList();
         
+        _logger.LogInformation("Found {LibraryCount} libraries with {TagCount} total tags", 
+            libraryList.Count, tags.Count);
+        
+        if (tags.Any())
+        {
+            _logger.LogInformation("Using library tags: {Tags}", string.Join(", ", tags.Take(10)));
+        }
+        
         if (!tags.Any() && userBooks.Any())
         {
-            _logger.LogInformation("No user tags found, auto-generating tags from {BookCount} books", userBooks.Count);
+            _logger.LogInformation("No library tags found, auto-generating tags from {BookCount} books", userBooks.Count);
             tags = await GenerateTagsFromBooks(userBooks);
             _logger.LogInformation("Auto-generated {TagCount} tags: {Tags}", tags.Count, string.Join(", ", tags));
         }
         
         if (tags.Any())
         {
-            _logger.LogInformation("Using {TagCount} tags for vocabulary enrichment", tags.Count);
+            _logger.LogInformation("Adding {TagCount} tags as vocabulary hints", tags.Count);
             
             // Add tags themselves as hints
             foreach (var tag in tags)
@@ -533,6 +541,7 @@ public class LibrariesController : ControllerBase
             }
             
             // Enrich with genre-related terms from external APIs
+            _logger.LogInformation("Enriching vocabulary from {TagCount} tags using external APIs", tags.Count);
             await EnrichVocabularyFromTags(tags, hints);
         }
         
@@ -584,9 +593,21 @@ public class LibrariesController : ControllerBase
             hints.UnionWith(GetGeneralBookVocabulary());
         }
         
+        // Phonetic variations handled client-side by iOS Speech framework
+        // Apple's SFCustomLanguageModelData provides superior ML-based recognition
+        
+        // Clean up hints - remove fragments, special characters, and very short terms
+        var cleanedHints = hints
+            .Where(h => h.Length > 2) // At least 3 characters
+            .Where(h => !h.Contains("(") && !h.Contains(")")) // No partial fragments like "(Madrid)"
+            .Where(h => !h.EndsWith(",")) // No trailing punctuation
+            .Where(h => !h.EndsWith(":"))
+            .Where(h => char.IsLetter(h[0])) // Starts with a letter
+            .ToList();
+
         var response = new VocabularyHintsResponse
         {
-            Hints = hints.OrderBy(h => h).ToList(),
+            Hints = cleanedHints.OrderBy(h => h).ToList(),
             Tags = tags,
             BookCount = userBooks.Count,
             IsPersonalized = userBooks.Any()
@@ -599,7 +620,7 @@ public class LibrariesController : ControllerBase
         
         return Ok(response);
     }
-    
+        
     /// <summary>
     /// Auto-generate tags from book collection based on common themes, publishers, and time periods
     /// </summary>

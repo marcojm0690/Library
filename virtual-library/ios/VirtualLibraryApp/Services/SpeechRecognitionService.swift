@@ -74,6 +74,7 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     // MARK: - Context Configuration
     
     /// Custom vocabulary hints to improve recognition accuracy
+    /// Apple's Speech framework has built-in ML for phonetic variations
     var vocabularyHints: [String] = []
     
     // MARK: - Recording Control
@@ -139,10 +140,11 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         
         recognitionRequest.shouldReportPartialResults = true
         
-        // Add vocabulary hints if available
+        // Add vocabulary hints for improved recognition
+        // Apple's Speech framework already uses ML for phonetic matching
         if !vocabularyHints.isEmpty {
             recognitionRequest.contextualStrings = vocabularyHints
-            print("📚 Added vocabulary hints: \(vocabularyHints)")
+            print("📚 Added \(vocabularyHints.count) vocabulary hints")
         }
         
         // Start recognition task
@@ -158,6 +160,9 @@ class SpeechRecognitionService: NSObject, ObservableObject {
                     print("\n🗣️ SPEECH: '\(transcription)' (final: \(result.isFinal))")
                     self.transcribedText = transcription
                     self.currentTranscription = transcription
+                    
+                    // Notify observers of transcription update
+                    NotificationCenter.default.post(name: .speechTranscriptionUpdated, object: transcription)
                     
                     // Reset timeout on each update
                     self.timeoutTask?.cancel()
@@ -267,4 +272,10 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     var isAvailable: Bool {
         authorizationStatus == .authorized
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let speechTranscriptionUpdated = Notification.Name("speechTranscriptionUpdated")
 }

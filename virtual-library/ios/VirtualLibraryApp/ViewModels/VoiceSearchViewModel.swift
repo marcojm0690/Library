@@ -73,6 +73,9 @@ class VoiceSearchViewModel: ObservableObject {
             // Load vocabulary hints before starting speech recognition
             await loadVocabularyHints()
             
+            // Start observing speech service transcription updates in real-time
+            startObservingSpeechUpdates()
+            
             // Start listening with timeout
             speechService.startListening { [weak self] result in
                 guard let self = self else { return }
@@ -99,7 +102,22 @@ class VoiceSearchViewModel: ObservableObject {
         }
     }
     
+    /// Observe real-time updates from speech service and sync to viewModel
+    private func startObservingSpeechUpdates() {
+        Task {
+            // Continuously monitor speechService.transcribedText changes
+            for await _ in NotificationCenter.default.notifications(named: .speechTranscriptionUpdated) {
+                await MainActor.run {
+                    if speechService.isListening {
+                        self.transcribedText = speechService.transcribedText
+                    }
+                }
+            }
+        }
+    }
+    
     /// Load vocabulary hints from the user's library to improve speech recognition
+    /// Uses contextualStrings - Apple's ML already handles phonetic variations
     private func loadVocabularyHints() async {
         // Get user ID from property or fallback to UserDefaults
         let userId = self.userId ?? UserDefaults.standard.string(forKey: "currentUserId")
@@ -116,10 +134,13 @@ class VoiceSearchViewModel: ObservableObject {
             print("📚 Personalized: \(hints.isPersonalized)")
             print("📚 Sample hints: \(hints.hints.prefix(10).joined(separator: ", "))")
             
-            // Update speech service vocabulary hints
+            // Set vocabulary hints using contextualStrings
+            // Apple's Speech framework already has ML-based phonetic matching built-in
             await MainActor.run {
                 speechService.vocabularyHints = hints.hints
             }
+            
+            print("✅ Vocabulary hints loaded for improved recognition")
             
         } catch {
             print("⚠️ Failed to load vocabulary hints: \(error)")
