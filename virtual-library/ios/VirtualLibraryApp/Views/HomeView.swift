@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var showCreateLibrary = false
     @State private var showVoiceSearch = false
     @State private var showLibraryPicker = false
+    @State private var showQuoteVerification = false
     @StateObject private var librariesViewModel = LibrariesListViewModel()
     
     var body: some View {
@@ -75,10 +76,8 @@ struct HomeView: View {
                     .cornerRadius(15)
                     .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
-                .padding(.horizontal, 10
-                )
+                .padding(.horizontal, 10)
                 
-            
                 // Navigation options
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Agregar libros")
@@ -136,6 +135,17 @@ struct HomeView: View {
                             )
                         }
                     }
+                        
+                        Button(action: {
+                            showQuoteVerification = true
+                        }) {
+                            CompactFeatureButton(
+                                icon: "quote.bubble.fill",
+                                title: "Verificar Cita",
+                                description: "Autenticidad y fuentes",
+                                color: .indigo
+                            )
+                        }
                     .padding(.horizontal, 20)
                 }
                 
@@ -167,7 +177,11 @@ struct HomeView: View {
                 )
             }
             .sheet(isPresented: $showVoiceSearch) {
-                if let library = librariesViewModel.libraries.first {
+             sheet(isPresented: $showQuoteVerification) {
+                QuoteVerificationView(userId: authService.user?.id)
+                    .environmentObject(authService)
+            }
+             if let library = librariesViewModel.libraries.first {
                     VoiceSearchView(
                         libraryId: library.id,
                         userId: authService.user?.id,

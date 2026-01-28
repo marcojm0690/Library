@@ -256,6 +256,9 @@ internal class MongoLibrary
     [BsonElement("isPublic")]
     public bool IsPublic { get; set; }
 
+    [BsonElement("type")]
+    public LibraryType Type { get; set; }
+
     public Library ToLibrary() => new()
     {
         Id = Id,
@@ -266,7 +269,8 @@ internal class MongoLibrary
         UpdatedAt = UpdatedAt,
         BookIds = BookIds,
         Tags = Tags,
-        IsPublic = IsPublic
+        IsPublic = IsPublic,
+        Type = Type
     };
 
     public static MongoLibrary FromLibrary(Library library) => new()
@@ -279,6 +283,7 @@ internal class MongoLibrary
         UpdatedAt = library.UpdatedAt,
         BookIds = library.BookIds,
         Tags = library.Tags,
-        IsPublic = library.IsPublic
+        IsPublic = library.IsPublic,
+        Type = library.Type
     };
 }

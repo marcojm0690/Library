@@ -594,3 +594,60 @@ enum APIError: LocalizedError {
         }
     }
 }
+
+extension BookApiService {
+    // MARK: - Quote Verification
+    
+    /// Verify a quote and its attribution
+    /// - Parameter request: Quote verification request with text, author, and input method
+    /// - Returns: Verification result with confidence score and possible sources
+    func verifyQuote(_ request: QuoteVerificationRequest) async throws -> QuoteVerificationResponse {
+        let url = URL(string: "\(baseURL)/api/quotes/verify")!
+        
+        print("📡 API Request: POST \(url)")
+        print("📦 Quote: \(request.quoteText)")
+        print("📦 Claimed Author: \(request.claimedAuthor ?? "nil")")
+        print("📦 Input Method: \(request.inputMethod)")
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+        
+        await MainActor.run { isLoading = true }
+        defer { Task { await MainActor.run { isLoading = false } } }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            
+            print("📥 Response Status: \(httpResponse.statusCode)")
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📥 Response Body: \(responseString)")
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw APIError.serverError(httpResponse.statusCode)
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .useDefaultKeys
+            let verificationResponse = try decoder.decode(QuoteVerificationResponse.self, from: data)
+            print("✅ Successfully verified quote with confidence: \(verificationResponse.overallConfidence)")
+            return verificationResponse
+            
+        } catch let error as APIError {
+            print("❌ API Error: \(error.localizedDescription)")
+            await MainActor.run { self.error = error.localizedDescription }
+            throw error
+        } catch {
+            print("❌ Network Error: \(error.localizedDescription)")
+            await MainActor.run { self.error = "Network error: \(error.localizedDescription)" }
+            throw APIError.networkError(error)
+        }
+    }
+}

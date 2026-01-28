@@ -31,6 +31,21 @@ struct CreateLibraryView: View {
                         }
                 }
                 
+                Section(header: Text("Library Type")) {
+                    Picker("Type", selection: $viewModel.libraryType) {
+                        ForEach(LibraryType.allCases) { type in
+                            Label {
+                                Text(type.displayName)
+                            } icon: {
+                                Image(systemName: type.icon)
+                                    .foregroundColor(colorForType(type))
+                            }
+                            .tag(type)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                
                 Section(header: Text("Tags")) {
                     HStack {
                         TextField("Add tag", text: $viewModel.currentTag)
@@ -132,6 +147,7 @@ struct CreateLibraryView: View {
         vm.description = viewModel.description
         vm.tags = viewModel.tags
         vm.isPublic = viewModel.isPublic
+        vm.libraryType = viewModel.libraryType
         
         print("🔵 Calling createLibrary...")
         await vm.createLibrary()
@@ -146,6 +162,16 @@ struct CreateLibraryView: View {
         } else if let error = vm.error {
             print("❌ Setting error: \(error)")
             viewModel.error = error
+        }
+    }
+    
+    private func colorForType(_ type: LibraryType) -> Color {
+        switch type {
+        case .read: return .green
+        case .toRead: return .blue
+        case .reading: return .orange
+        case .wishlist: return .purple
+        case .favorites: return .red
         }
     }
 }

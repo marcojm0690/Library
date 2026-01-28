@@ -1,5 +1,7 @@
 namespace VirtualLibrary.Api.Application.DTOs;
 
+using VirtualLibrary.Api.Domain;
+
 /// <summary>
 /// Request DTO for creating a new library
 /// </summary>
@@ -10,6 +12,7 @@ public record CreateLibraryRequest
     public string Owner { get; init; } = string.Empty;
     public List<string>? Tags { get; init; }
     public bool IsPublic { get; init; } = false;
+    public LibraryType Type { get; init; } = LibraryType.Read;
 }
 
 /// <summary>
@@ -27,6 +30,7 @@ public record LibraryResponse
     public int BookCount { get; init; }
     public List<string> Tags { get; init; } = new();
     public bool IsPublic { get; init; }
+    public LibraryType Type { get; init; }
 }
 
 /// <summary>
@@ -38,6 +42,7 @@ public record UpdateLibraryRequest
     public string? Description { get; init; }
     public List<string>? Tags { get; init; }
     public bool? IsPublic { get; init; }
+    public LibraryType? Type { get; init; }
 }
 
 /// <summary>

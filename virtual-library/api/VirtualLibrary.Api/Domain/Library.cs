@@ -50,4 +50,21 @@ public class Library
     /// Whether the library is public or private
     /// </summary>
     public bool IsPublic { get; set; } = false;
+
+    /// <summary>
+    /// Type of library (Read, ToRead, Reading, etc.)
+    /// </summary>
+    public LibraryType Type { get; set; } = LibraryType.Read;
+}
+
+/// <summary>
+/// Types of libraries for categorizing reading status
+/// </summary>
+public enum LibraryType
+{
+    Read = 0,
+    ToRead = 1,
+    Reading = 2,
+    Wishlist = 3,
+    Favorites = 4
 }

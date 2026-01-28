@@ -7,6 +7,7 @@ class CreateLibraryViewModel: ObservableObject {
     @Published var description = ""
     @Published var tags: [String] = []
     @Published var isPublic = false
+    @Published var libraryType: LibraryType = .read
     @Published var currentTag = ""
     
     @Published var isCreating = false
@@ -69,7 +70,8 @@ class CreateLibraryViewModel: ObservableObject {
                 description: description.isEmpty ? nil : description.trimmingCharacters(in: .whitespaces),
                 owner: userId,
                 tags: tags.isEmpty ? nil : tags,
-                isPublic: isPublic
+                isPublic: isPublic,
+                type: libraryType
             )
             
             createdLibrary = try await apiService.createLibrary(request)
@@ -87,6 +89,7 @@ class CreateLibraryViewModel: ObservableObject {
         name = ""
         description = ""
         tags = []
+        libraryType = .read
         isPublic = false
         currentTag = ""
         error = nil

@@ -144,7 +144,8 @@ public class LibrariesController : ControllerBase
             Description = request.Description,
             Owner = request.Owner,
             Tags = request.Tags ?? new List<string>(),
-            IsPublic = request.IsPublic
+            IsPublic = request.IsPublic,
+            Type = request.Type
         };
 
         _logger.LogInformation("🔵 Creating library in database...");
@@ -1071,6 +1072,7 @@ public class LibrariesController : ControllerBase
         BookIds = library.BookIds,
         BookCount = library.BookIds.Count,
         Tags = library.Tags,
-        IsPublic = library.IsPublic
+        IsPublic = library.IsPublic,
+        Type = library.Type
     };
 }
