@@ -2,7 +2,7 @@
 
 A cloud-native mono-repository containing a .NET 8 Web API and iOS SwiftUI app for identifying and cataloging books through ISBN barcode scanning and cover image analysis (OCR).
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Swift](https://img.shields.io/badge/Swift-5.9-FA7343?logo=swift)](https://swift.org/)
 [![Azure](https://img.shields.io/badge/Azure-Cloud-0078D4?logo=microsoftazure)](https://azure.microsoft.com/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker)](https://www.docker.com/)
@@ -102,7 +102,7 @@ POST /api/quotes                    # Add book quotes
 
 ### Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker](https://www.docker.com/get-started) (for containerization)
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) (for deployment)
 - [Xcode 15+](https://developer.apple.com/xcode/) (for iOS development)
@@ -248,7 +248,7 @@ This project is private and proprietary.
 
 ## 🔗 Related Resources
 
-- [.NET 8 Documentation](https://docs.microsoft.com/dotnet/)
+- [.NET 10 Documentation](https://docs.microsoft.com/dotnet/)
 - [Azure App Service](https://docs.microsoft.com/azure/app-service/)
 - [Azure Cosmos DB](https://docs.microsoft.com/azure/cosmos-db/)
 - [SwiftUI Documentation](https://developer.apple.com/documentation/swiftui)
