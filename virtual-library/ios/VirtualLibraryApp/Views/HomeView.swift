@@ -12,34 +12,35 @@ struct HomeView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 25) {
-                // App header
-                VStack(spacing: 10) {
-                    Image(systemName: "books.vertical.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(.blue)
-                    
-                    // Welcome message with user name
-                    if let userName = authService.user?.fullName {
-                        Text("¡Bienvenido!")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Text(userName)
-                            .font(.title)
-                            .fontWeight(.bold)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // App header
+                    VStack(spacing: 10) {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.system(size: 40))
                             .foregroundColor(.blue)
-                    } else {
-                        Text("Biblioteca Virtual")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                        
+                        // Welcome message with user name
+                        if let userName = authService.user?.fullName {
+                            Text("¡Bienvenido!")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            
+                            Text(userName)
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("Biblioteca Virtual")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                        }
+                        
+                        Text("Identifica y agrega libros a tu biblioteca")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
-                    
-                    Text("Identifica y agrega libros a tu biblioteca")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 10)
+                    .padding(.top, 10)
                 
                 // Quick Voice Search Action
                 Button(action: {
@@ -146,10 +147,10 @@ struct HomeView: View {
                                 color: .indigo
                             )
                         }
+                    }
                     .padding(.horizontal, 20)
                 }
-                
-                Spacer()
+                .padding(.bottom, 20)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -170,18 +171,15 @@ struct HomeView: View {
                     libraries: librariesViewModel.libraries,
                     onLibrarySelected: { library in
                         showLibraryPicker = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             showVoiceSearch = true
                         }
-                    }
+                    },
+                    selectedLibrary: librariesViewModel.libraries.first
                 )
             }
             .sheet(isPresented: $showVoiceSearch) {
-             sheet(isPresented: $showQuoteVerification) {
-                QuoteVerificationView(userId: authService.user?.id)
-                    .environmentObject(authService)
-            }
-             if let library = librariesViewModel.libraries.first {
+                if let library = librariesViewModel.libraries.first {
                     VoiceSearchView(
                         libraryId: library.id,
                         userId: authService.user?.id,
@@ -191,6 +189,10 @@ struct HomeView: View {
                     )
                     .environmentObject(authService)
                 }
+            }
+            .sheet(isPresented: $showQuoteVerification) {
+                QuoteVerificationView(userId: authService.user?.id)
+                    .environmentObject(authService)
             }
             .task {
                 if let userId = authService.user?.id {
@@ -248,23 +250,52 @@ struct CompactFeatureButton: View {
 struct LibraryPickerForVoiceSearchView: View {
     let libraries: [LibraryModel]
     let onLibrarySelected: (LibraryModel) -> Void
+    let selectedLibrary: LibraryModel?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationView {
-            List(libraries) { library in
-                Button(action: {
-                    onLibrarySelected(library)
-                }) {
-                    HStack {
-                        Image(systemName: "books.vertical.fill")
-                            .foregroundColor(.blue)
-                        Text(library.name)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
+            VStack {
+                if libraries.isEmpty {
+                    VStack(spacing: 20) {
+                        Image(systemName: "books.vertical")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        Text("No tienes bibliotecas")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        Text("Crea una biblioteca primero")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(libraries) { library in
+                        Button(action: {
+                            onLibrarySelected(library)
+                            dismiss()
+                        }) {
+                            HStack {
+                                Image(systemName: "books.vertical.fill")
+                                    .foregroundColor(.blue)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(library.name)
+                                        .foregroundColor(.primary)
+                                        .fontWeight(.medium)
+                                    if let description = library.description {
+                                        Text(description)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                                if library.id == selectedLibrary?.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
                     }
                 }
             }
