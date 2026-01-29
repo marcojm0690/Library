@@ -13,142 +13,127 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // App header
-                    VStack(spacing: 10) {
+                VStack(spacing: 24) {
+                    // Compact header
+                    VStack(spacing: 8) {
                         Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 40))
+                            .font(.system(size: 50))
                             .foregroundColor(.blue)
                         
-                        // Welcome message with user name
                         if let userName = authService.user?.fullName {
-                            Text("¡Bienvenido!")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                            
                             Text(userName)
-                                .font(.title)
+                                .font(.title2)
                                 .fontWeight(.bold)
-                                .foregroundColor(.blue)
                         } else {
                             Text("Biblioteca Virtual")
-                                .font(.largeTitle)
+                                .font(.title3)
                                 .fontWeight(.bold)
                         }
-                        
-                        Text("Identifica y agrega libros a tu biblioteca")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
                     }
-                    .padding(.top, 10)
-                
-                // Quick Voice Search Action
-                Button(action: {
-                    Task {
-                        if let userId = authService.user?.id {
-                            await librariesViewModel.loadLibraries(for: userId)
+                    .padding(.top, 20)
+                    
+                    // Featured Voice Search
+                    Button(action: {
+                        Task {
+                            if let userId = authService.user?.id {
+                                await librariesViewModel.loadLibraries(for: userId)
+                            }
                         }
-                    }
-                    showLibraryPicker = true
-                }) {
-                    HStack {
-                        Image(systemName: "mic.circle.fill")
-                            .font(.system(size: 32))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Búsqueda por voz")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                            Text("Di el nombre del libro")
+                        showLibraryPicker = true
+                    }) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "mic.circle.fill")
+                                .font(.system(size: 28))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Búsqueda por voz")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Text("Di el nombre del libro")
+                                    .font(.caption)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .opacity(0.9)
+                                .fontWeight(.semibold)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                        .foregroundColor(.white)
+                        .padding(16)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
-                    .cornerRadius(15)
-                    .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .padding(.horizontal, 10)
-                
-                // Navigation options
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Agregar libros")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 10)
+                        .cornerRadius(12)
+                        .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 16)
                     
-                    VStack(spacing: 12) {
-                        NavigationLink(destination: ScanIsbnView()) {
-                            CompactFeatureButton(
-                                icon: "barcode.viewfinder",
-                                title: "Escanear ISBN",
-                                description: "Código de barras",
-                                color: .blue
-                            )
+                    // Quick Actions Grid
+                    VStack(spacing: 16) {
+                        HStack(spacing: 12) {
+                            NavigationLink(destination: ScanIsbnView()) {
+                                QuickActionCard(
+                                    icon: "barcode.viewfinder",
+                                    title: "Escanear ISBN",
+                                    color: .blue
+                                )
+                            }
+                            
+                            NavigationLink(destination: LibrarySelectionForScanView()) {
+                                QuickActionCard(
+                                    icon: "camera.viewfinder",
+                                    title: "Escanear cubierta",
+                                    color: .green
+                                )
+                            }
                         }
                         
-                        NavigationLink(destination: LibrarySelectionForScanView()) {
-                            CompactFeatureButton(
-                                icon: "camera.viewfinder",
-                                title: "Escanear cubierta",
-                                description: "Múltiples libros",
-                                color: .green
-                            )
+                        HStack(spacing: 12) {
+                            NavigationLink(destination: LibrariesListView()) {
+                                QuickActionCard(
+                                    icon: "books.vertical.fill",
+                                    title: "Mis bibliotecas",
+                                    color: .orange
+                                )
+                            }
+                            
+                            Button(action: {
+                                showCreateLibrary = true
+                            }) {
+                                QuickActionCard(
+                                    icon: "plus.rectangle.on.folder",
+                                    title: "Crear biblioteca",
+                                    color: .purple
+                                )
+                            }
                         }
-                    }
-                    .padding(.horizontal, 15)
-                    
-                    Divider()
-                        .padding(.vertical, 8)
-                    
-                    Text("Bibliotecas")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 15)
-                    
-                    VStack(spacing: 12) {
-                        NavigationLink(destination: LibrariesListView()) {
-                            CompactFeatureButton(
-                                icon: "books.vertical.fill",
-                                title: "Ver bibliotecas",
-                                description: "Explora tus colecciones",
-                                color: .orange
-                            )
-                        }
-                        
-                        Button(action: {
-                            showCreateLibrary = true
-                        }) {
-                            CompactFeatureButton(
-                                icon: "plus.rectangle.on.folder.fill",
-                                title: "Crear biblioteca",
-                                description: "Nueva colección",
-                                color: .purple
-                            )
-                        }
-                    }
                         
                         Button(action: {
                             showQuoteVerification = true
                         }) {
-                            CompactFeatureButton(
-                                icon: "quote.bubble.fill",
-                                title: "Verificar Cita",
-                                description: "Autenticidad y fuentes",
-                                color: .indigo
-                            )
+                            HStack(spacing: 12) {
+                                Image(systemName: "quote.bubble.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.indigo)
+                                Text("Verificar Cita")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(14)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 16)
                 }
                 .padding(.bottom, 20)
             }
@@ -203,7 +188,41 @@ struct HomeView: View {
     }
 }
 
-/// Compact button component for feature navigation
+/// Quick action card for 2x2 grid
+struct QuickActionCard: View {
+    let icon: String
+    let title: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 56, height: 56)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(color)
+            }
+            
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+/// Compact button component for feature navigation (deprecated, kept for compatibility)
 struct CompactFeatureButton: View {
     let icon: String
     let title: String
@@ -312,7 +331,9 @@ struct LibraryPickerForVoiceSearchView: View {
     }
 }
 
-#Preview {
-    HomeView()
-        .environmentObject(AuthenticationService())
+struct HomeView_Previews: PreviewProvider {
+    static var previews: some View {
+        HomeView()
+            .environmentObject(AuthenticationService())
+    }
 }
