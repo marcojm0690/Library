@@ -3,7 +3,7 @@
 A cloud-native mono-repository containing a .NET 8 Web API and iOS SwiftUI app for identifying and cataloging books through ISBN barcode scanning and cover image analysis (OCR).
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![Swift](https://img.shields.io/badge/Swift-5.9-FA7343?logo=swift)](https://swift.org/)
+[![Swift](https://img.shields.io/badge/Swift-6.2.3-FA7343?logo=swift)](https://swift.org/)
 [![Azure](https://img.shields.io/badge/Azure-Cloud-0078D4?logo=microsoftazure)](https://azure.microsoft.com/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker)](https://www.docker.com/)
 
