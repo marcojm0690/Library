@@ -90,28 +90,42 @@ public class LibrariesController : ControllerBase
     /// </summary>
     [HttpGet("owner/{owner}")]
     [ProducesResponseType(typeof(IEnumerable<LibraryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<LibraryResponse>>> GetByOwner(string owner)
     {
-        var cacheKey = $"libraries:owner:{owner}";
-        
-        // Check cache first
-        var cachedLibraries = await _cache.GetAsync<List<Library>>(cacheKey);
-        if (cachedLibraries != null)
+        try
         {
-            _logger.LogInformation("Cache hit for owner {Owner} libraries", owner);
-            var cachedResponses = cachedLibraries.Select(MapToResponse);
-            return Ok(cachedResponses);
+            _logger.LogInformation("🔵 GetByOwner called for owner: {Owner}", owner);
+            
+            var cacheKey = $"libraries:owner:{owner}";
+            
+            // Check cache first
+            _logger.LogDebug("Checking cache for key: {CacheKey}", cacheKey);
+            var cachedLibraries = await _cache.GetAsync<List<Library>>(cacheKey);
+            if (cachedLibraries != null)
+            {
+                _logger.LogInformation("✅ Cache hit for owner {Owner} libraries (count: {Count})", owner, cachedLibraries.Count);
+                var cachedResponses = cachedLibraries.Select(MapToResponse);
+                return Ok(cachedResponses);
+            }
+            
+            _logger.LogInformation("Cache miss for owner {Owner} libraries - querying database", owner);
+            var libraries = await _libraryRepository.GetByOwnerAsync(owner);
+            var libraryList = libraries.ToList();
+            _logger.LogInformation("✅ Retrieved {Count} libraries from database for owner {Owner}", libraryList.Count, owner);
+            
+            // Cache for 3 minutes (shorter since this might change more frequently)
+            await _cache.SetAsync(cacheKey, libraryList, TimeSpan.FromMinutes(3));
+            _logger.LogDebug("Cached libraries for owner {Owner}", owner);
+            
+            var responses = libraryList.Select(MapToResponse);
+            return Ok(responses);
         }
-        
-        _logger.LogInformation("Cache miss for owner {Owner} libraries", owner);
-        var libraries = await _libraryRepository.GetByOwnerAsync(owner);
-        var libraryList = libraries.ToList();
-        
-        // Cache for 3 minutes (shorter since this might change more frequently)
-        await _cache.SetAsync(cacheKey, libraryList, TimeSpan.FromMinutes(3));
-        
-        var responses = libraryList.Select(MapToResponse);
-        return Ok(responses);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error getting libraries for owner {Owner}: {Message}", owner, ex.Message);
+            return StatusCode(500, new { error = "Failed to retrieve libraries", message = ex.Message });
+        }
     }
 
     /// <summary>

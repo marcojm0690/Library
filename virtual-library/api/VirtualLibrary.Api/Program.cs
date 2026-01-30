@@ -111,6 +111,29 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Configure global exception handling
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+
+        var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+        var exception = exceptionHandlerPathFeature?.Error;
+
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(exception, "Unhandled exception occurred: {Path}", context.Request.Path);
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            error = "An error occurred processing your request.",
+            message = app.Environment.IsDevelopment() ? exception?.Message : "Internal server error",
+            path = context.Request.Path.Value
+        });
+    });
+});
+
 // Seed in-memory repository with mock data in development
 if (app.Environment.IsDevelopment() && string.IsNullOrEmpty(connectionString))
 {
