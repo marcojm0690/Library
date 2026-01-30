@@ -6,6 +6,12 @@ using VirtualLibrary.Api.Infrastructure;
 using VirtualLibrary.Api.Infrastructure.External;
 using VirtualLibrary.Api.Infrastructure.Persistence;
 using VirtualLibrary.Api.Infrastructure.Cache;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
+
+// Configure MongoDB GUID serialization to use standard representation
+BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
 
 var builder = WebApplication.CreateBuilder(args);
 

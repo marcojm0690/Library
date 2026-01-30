@@ -224,6 +224,7 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
     private class MongoBook
     {
         [BsonId]
+        [BsonGuidRepresentation(GuidRepresentation.Standard)]
         public Guid Id { get; set; }
 
         [BsonElement("isbn")]
