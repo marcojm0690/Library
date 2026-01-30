@@ -1,0 +1,83 @@
+/* 
+  Localizable.strings (Spanish)
+  VirtualLibrary
+*/
+
+// MARK: - General
+"app.name" = "Biblioteca Virtual";
+"general.ok" = "OK";
+"general.cancel" = "Cancelar";
+"general.error" = "Error";
+"general.loading" = "Cargando";
+"general.save" = "Guardar";
+"general.delete" = "Eliminar";
+"general.edit" = "Editar";
+"general.done" = "Listo";
+"general.retry" = "Reintentar";
+"general.close" = "Cerrar";
+
+// MARK: - Home
+"home.title" = "Inicio";
+"home.scanISBN" = "Escanear ISBN";
+"home.scanCover" = "Escanear Portada";
+"home.voiceSearch" = "Búsqueda por Voz";
+"home.myLibraries" = "Mis Bibliotecas";
+"home.verifyQuote" = "Verificar Cita";
+
+// MARK: - Scanner
+"scanner.title" = "Escáner de ISBN";
+"scanner.coverTitle" = "Escáner de Portada";
+"scanner.instructions" = "Apunta la cámara al código de barras";
+"scanner.takePhoto" = "Tomar Foto";
+"scanner.chooseLibrary" = "Elegir de la Biblioteca";
+"scanner.processing" = "Procesando imagen...";
+"scanner.extracting" = "Extrayendo texto y buscando...";
+
+// MARK: - Books
+"book.details" = "Detalles del Libro";
+"book.author" = "Autor";
+"book.publisher" = "Editorial";
+"book.publishYear" = "Publicado";
+"book.pages" = "Páginas";
+"book.isbn" = "ISBN";
+"book.addToLibrary" = "Agregar a Biblioteca";
+"book.removeFromLibrary" = "Quitar de Biblioteca";
+"book.inLibrary" = "En Biblioteca";
+"book.searchResults" = "Resultados de Búsqueda";
+
+// MARK: - Quote Verification
+"quote.title" = "Verificar Cita";
+"quote.enter" = "Ingresa la cita a verificar";
+"quote.author" = "Autor (opcional)";
+"quote.verify" = "Verificar";
+"quote.verified" = "Cita Verificada";
+"quote.partial" = "Verificación Parcial";
+"quote.confidence" = "Nivel de Confianza";
+"quote.context" = "Contexto";
+"quote.sources" = "Fuentes Posibles";
+"quote.highConfidence" = "Alta confianza - La cita parece ser auténtica";
+"quote.mediumConfidence" = "Confianza media - Puede requerir verificación adicional";
+"quote.lowConfidence" = "Baja confianza - La cita puede ser inexacta o falsa";
+
+// MARK: - Libraries
+"library.title" = "Bibliotecas";
+"library.my" = "Mi Biblioteca";
+"library.create" = "Crear Biblioteca";
+"library.name" = "Nombre de la Biblioteca";
+"library.booksCount" = "libros";
+"library.empty" = "No hay libros en esta biblioteca";
+
+// MARK: - Voice Search
+"voice.title" = "Búsqueda por Voz";
+"voice.tapToSpeak" = "Toca para hablar";
+"voice.listening" = "Escuchando...";
+"voice.processing" = "Procesando...";
+
+// MARK: - Errors
+"error.generic" = "Ocurrió un error";
+"error.network" = "Error de red. Por favor verifica tu conexión.";
+"error.bookNotFound" = "Libro no encontrado";
+"error.invalidISBN" = "ISBN inválido";
+"error.cameraPermission" = "Permiso de cámara denegado";
+"error.microphonePermission" = "Permiso de micrófono denegado";
+"error.photoPermission" = "Permiso de biblioteca de fotos denegado";

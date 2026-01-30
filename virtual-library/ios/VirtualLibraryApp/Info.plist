@@ -52,6 +52,8 @@
 	<string>Virtual Library needs access to the camera to scan book barcodes and take photos of book covers for identification.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Virtual Library needs access to your photo library to select book cover images for identification.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Virtual Library needs permission to save book covers to your photo library.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Virtual Library needs access to speech recognition to let you search for books by voice. Just say the book title or author name.</string>
 	<key>NSMicrophoneUsageDescription</key>

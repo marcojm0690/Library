@@ -1,0 +1,83 @@
+/* 
+  Localizable.strings (English)
+  VirtualLibrary
+*/
+
+// MARK: - General
+"app.name" = "Virtual Library";
+"general.ok" = "OK";
+"general.cancel" = "Cancel";
+"general.error" = "Error";
+"general.loading" = "Loading";
+"general.save" = "Save";
+"general.delete" = "Delete";
+"general.edit" = "Edit";
+"general.done" = "Done";
+"general.retry" = "Retry";
+"general.close" = "Close";
+
+// MARK: - Home
+"home.title" = "Home";
+"home.scanISBN" = "Scan ISBN";
+"home.scanCover" = "Scan Cover";
+"home.voiceSearch" = "Voice Search";
+"home.myLibraries" = "My Libraries";
+"home.verifyQuote" = "Verify Quote";
+
+// MARK: - Scanner
+"scanner.title" = "ISBN Scanner";
+"scanner.coverTitle" = "Cover Scanner";
+"scanner.instructions" = "Point camera at barcode";
+"scanner.takePhoto" = "Take Photo";
+"scanner.chooseLibrary" = "Choose from Library";
+"scanner.processing" = "Processing image...";
+"scanner.extracting" = "Extracting text and searching...";
+
+// MARK: - Books
+"book.details" = "Book Details";
+"book.author" = "Author";
+"book.publisher" = "Publisher";
+"book.publishYear" = "Published";
+"book.pages" = "Pages";
+"book.isbn" = "ISBN";
+"book.addToLibrary" = "Add to Library";
+"book.removeFromLibrary" = "Remove from Library";
+"book.inLibrary" = "In Library";
+"book.searchResults" = "Search Results";
+
+// MARK: - Quote Verification
+"quote.title" = "Verify Quote";
+"quote.enter" = "Enter quote to verify";
+"quote.author" = "Author (optional)";
+"quote.verify" = "Verify";
+"quote.verified" = "Quote Verified";
+"quote.partial" = "Partial Verification";
+"quote.confidence" = "Confidence Level";
+"quote.context" = "Context";
+"quote.sources" = "Possible Sources";
+"quote.highConfidence" = "High confidence - Quote appears authentic";
+"quote.mediumConfidence" = "Medium confidence - May require additional verification";
+"quote.lowConfidence" = "Low confidence - Quote may be inaccurate or false";
+
+// MARK: - Libraries
+"library.title" = "Libraries";
+"library.my" = "My Library";
+"library.create" = "Create Library";
+"library.name" = "Library Name";
+"library.booksCount" = "books";
+"library.empty" = "No books in this library";
+
+// MARK: - Voice Search
+"voice.title" = "Voice Search";
+"voice.tapToSpeak" = "Tap to speak";
+"voice.listening" = "Listening...";
+"voice.processing" = "Processing...";
+
+// MARK: - Errors
+"error.generic" = "An error occurred";
+"error.network" = "Network error. Please check your connection.";
+"error.bookNotFound" = "Book not found";
+"error.invalidISBN" = "Invalid ISBN";
+"error.cameraPermission" = "Camera permission denied";
+"error.microphonePermission" = "Microphone permission denied";
+"error.photoPermission" = "Photo library permission denied";

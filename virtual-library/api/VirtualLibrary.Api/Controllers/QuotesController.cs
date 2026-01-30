@@ -282,19 +282,27 @@ public class QuotesController : ControllerBase
 
     private string GenerateContext(QuoteSource source)
     {
-        var context = $"This quote appears to be from \"{source.Book.Title}\"";
+        var context = $"Esta cita parece provenir de \"{source.Book.Title}\"";
         
         if (source.Book.Authors.Any())
         {
-            context += $" by {string.Join(", ", source.Book.Authors)}";
+            context += $" de {string.Join(", ", source.Book.Authors)}";
         }
 
         if (source.Book.PublishYear.HasValue)
         {
-            context += $", published in {source.Book.PublishYear}";
+            context += $", publicado en {source.Book.PublishYear}";
         }
 
-        context += $". {source.Book.Description?.Substring(0, Math.Min(200, source.Book.Description?.Length ?? 0))}";
+        if (!string.IsNullOrWhiteSpace(source.Book.Description))
+        {
+            var descLength = Math.Min(200, source.Book.Description.Length);
+            context += $". {source.Book.Description.Substring(0, descLength)}";
+            if (source.Book.Description.Length > 200)
+            {
+                context += "...";
+            }
+        }
 
         return context;
     }
