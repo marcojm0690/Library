@@ -95,8 +95,17 @@ public class QuotesController : ControllerBase
             // Cache result for 24 hours
             await _cache.SetAsync(cacheKey, response, TimeSpan.FromHours(24));
 
-            _logger.LogInformation("Quote verification complete. Confidence: {Confidence}, Sources: {Count}", 
-                response.OverallConfidence, response.PossibleSources.Count);
+            _logger.LogInformation(
+                "Quote verification complete. Confidence: {Confidence:P}, IsVerified: {IsVerified}, AuthorVerified: {AuthorVerified}, Sources: {Count}", 
+                response.OverallConfidence, response.IsVerified, response.AuthorVerified, response.PossibleSources.Count);
+            
+            if (response.PossibleSources.Any())
+            {
+                _logger.LogDebug("Top source: {Title} by {Author} - Confidence: {Confidence:P}", 
+                    response.PossibleSources.First().Book.Title,
+                    string.Join(", ", response.PossibleSources.First().Book.Authors),
+                    response.PossibleSources.First().Confidence);
+            }
 
             return Ok(response);
         }
@@ -159,13 +168,33 @@ public class QuotesController : ControllerBase
 
             foreach (var book in books.Take(3))
             {
-                response.PossibleSources.Add(new QuoteSource
+                // Calculate confidence based on description match if available
+                var confidence = CalculateQuoteMatch(request.QuoteText, book.Description);
+                
+                // If no description or low match, use author match as fallback
+                if (confidence < 0.3 && !string.IsNullOrWhiteSpace(request.ClaimedAuthor))
                 {
-                    Book = book,
-                    Confidence = 0.4, // Lower confidence for Open Library as we can't search quote text
-                    MatchType = "Author Match",
-                    Source = "Open Library"
-                });
+                    var authorMatch = book.Authors.Any(a => 
+                        a.ToLower().Contains(request.ClaimedAuthor.ToLower()) || 
+                        request.ClaimedAuthor.ToLower().Contains(a.ToLower()));
+                    
+                    if (authorMatch)
+                    {
+                        confidence = 0.35; // Lower confidence for author-only match
+                    }
+                }
+                
+                // Only add sources with meaningful confidence
+                if (confidence >= 0.3)
+                {
+                    response.PossibleSources.Add(new QuoteSource
+                    {
+                        Book = book,
+                        Confidence = confidence,
+                        MatchType = confidence >= 0.5 ? "Description Match" : "Author Match",
+                        Source = "Open Library"
+                    });
+                }
             }
         }
         catch (Exception ex)
@@ -202,9 +231,35 @@ public class QuotesController : ControllerBase
         if (!response.PossibleSources.Any())
             return 0;
 
-        // Weighted average of top sources
-        var topSources = response.PossibleSources.OrderByDescending(s => s.Confidence).Take(3);
-        return topSources.Average(s => s.Confidence);
+        // Use the highest confidence source as the primary indicator
+        var maxConfidence = response.PossibleSources.Max(s => s.Confidence);
+        
+        // If we have multiple high-confidence sources, boost the overall confidence
+        var highConfidenceSources = response.PossibleSources.Count(s => s.Confidence >= 0.6);
+        if (highConfidenceSources >= 2)
+        {
+            return Math.Min(0.95, maxConfidence + 0.1);
+        }
+        
+        // If we only have one source, use weighted average with emphasis on the top source
+        var topSources = response.PossibleSources.OrderByDescending(s => s.Confidence).Take(3).ToList();
+        if (topSources.Count == 1)
+        {
+            return topSources[0].Confidence;
+        }
+        
+        // Weighted average: top source 60%, second 25%, third 15%
+        var weights = new[] { 0.6, 0.25, 0.15 };
+        double weightedSum = 0;
+        double totalWeight = 0;
+        
+        for (int i = 0; i < Math.Min(topSources.Count, weights.Length); i++)
+        {
+            weightedSum += topSources[i].Confidence * weights[i];
+            totalWeight += weights[i];
+        }
+        
+        return weightedSum / totalWeight;
     }
 
     private bool VerifyAuthor(QuoteVerificationResponse response, string? claimedAuthor)
