@@ -15,7 +15,7 @@ var vnetName = '${appName}-vnet'
 var cosmosDbName = 'LibraryDb'
 var cosmosDbCollection = 'Books'
 var redisName = '${appName}-redis-${environment}'
-var translatorName = '${appName}-translator-${environment}'
+var translatorName = '${appName}-translator-${environment}-${uniqueString(resourceGroup().id)}'
 
 // Create Virtual Network for private endpoints
 resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
