@@ -144,6 +144,66 @@ public class AuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Mobile OAuth callback - handles Microsoft redirect and deep-links back to iOS app
+    /// </summary>
+    [HttpGet("callback/microsoft/mobile")]
+    public async Task<IActionResult> MicrosoftMobileCallback([FromQuery] string code, [FromQuery] string? state)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(code))
+            {
+                return Redirect("virtuallibrary://oauth-complete?error=no_code");
+            }
+
+            // Exchange authorization code for access token
+            var tokenResponse = await ExchangeCodeForTokenAsync(code);
+            if (tokenResponse == null)
+            {
+                return Redirect("virtuallibrary://oauth-complete?error=token_exchange_failed");
+            }
+
+            // Get user info from Microsoft Graph
+            var userInfo = await GetMicrosoftUserInfoAsync(tokenResponse.AccessToken);
+            if (userInfo == null)
+            {
+                return Redirect("virtuallibrary://oauth-complete?error=user_info_failed");
+            }
+
+            // Find or create user
+            var user = await _userRepository.GetByExternalIdAsync(userInfo.Id, "microsoft");
+            if (user == null)
+            {
+                user = new User
+                {
+                    ExternalId = userInfo.Id,
+                    Provider = "microsoft",
+                    Email = userInfo.Mail ?? userInfo.UserPrincipalName ?? "",
+                    DisplayName = userInfo.DisplayName,
+                    ProfilePictureUrl = null
+                };
+                user = await _userRepository.CreateAsync(user);
+            }
+            else
+            {
+                user.LastLoginAt = DateTime.UtcNow;
+                await _userRepository.UpdateAsync(user);
+            }
+
+            // Generate JWT token
+            var jwtToken = GenerateJwtToken(user);
+
+            // Redirect back to iOS app with token
+            return Redirect($"virtuallibrary://oauth-complete?token={Uri.EscapeDataString(jwtToken)}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during mobile Microsoft OAuth callback");
+            return Redirect("virtuallibrary://oauth-complete?error=internal_error");
+        }
+    }
+
     private async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code)
     {
         var clientId = _configuration["OAuth:Microsoft:ClientId"];

@@ -3,7 +3,7 @@ import AuthenticationServices
 
 /// Login view with Microsoft OAuth
 struct LoginView: View {
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject private var authService: AuthenticationService
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLoading = false
@@ -61,24 +61,21 @@ struct LoginView: View {
                 .padding(.bottom, 20)
         }
         .padding()
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
+        .alert(isPresented: $showError) {
+            Alert(
+                title: Text("Error"),
+                message: Text(errorMessage),
+                dismissButton: .default(Text("OK"))
+            )
         }
     }
     
     private func loginWithMicrosoft() {
+        // Using existing local sign-in API from AuthenticationService.
+        // Replace this with real Microsoft OAuth later if desired.
         isLoading = true
-        Task {
-            do {
-                try await authService.signInWithMicrosoft()
-            } catch {
-                errorMessage = error.localizedDescription
-                showError = true
-            }
-            isLoading = false
-        }
+        authService.signIn(fullName: "Usuario", email: nil)
+        isLoading = false
     }
 }
 

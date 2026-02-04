@@ -2,7 +2,7 @@ import SwiftUI
 
 /// View to display user's libraries
 struct LibrariesListView: View {
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject private var authService: AuthenticationService
     @StateObject private var viewModel = LibrariesListViewModel()
     @State private var showCreateLibrary = false
     @State private var selectedTypeFilter: LibraryType?
