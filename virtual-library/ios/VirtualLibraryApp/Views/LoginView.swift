@@ -1,11 +1,12 @@
 import SwiftUI
+import AuthenticationServices
 
-/// Login view with simple local authentication (no Sign in with Apple required)
+/// Login view with Microsoft OAuth
 struct LoginView: View {
     @EnvironmentObject var authService: AuthenticationService
-    @State private var fullName = ""
-    @State private var email = ""
     @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var isLoading = false
 
     var body: some View {
         VStack(spacing: 40) {
@@ -27,60 +28,57 @@ struct LoginView: View {
             
             Spacer()
             
-            // Simple login form
+            // OAuth login buttons
             VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tu Nombre")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    TextField("Nombre completo", text: $fullName)
-                        .textFieldStyle(.roundedBorder)
-                        .autocapitalization(.words)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Email (opcional)")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    TextField("tu@email.com", text: $email)
-                        .textFieldStyle(.roundedBorder)
-                        .autocapitalization(.none)
-                        .keyboardType(.emailAddress)
-                }
-                
-                Button(action: {
-                    guard !fullName.trimmingCharacters(in: .whitespaces).isEmpty else {
-                        showError = true
-                        return
+                Button(action: loginWithMicrosoft) {
+                    HStack {
+                        Image(systemName: "microsoft.logo")
+                            .font(.title3)
+                        Text("Continuar con Microsoft")
+                            .fontWeight(.semibold)
                     }
-                    authService.signIn(
-                        fullName: fullName,
-                        email: email.isEmpty ? nil : email
-                    )
-                }) {
-                    Text("Comenzar")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(fullName.trimmingCharacters(in: .whitespaces).isEmpty ? Color.gray : Color.blue)
-                        .cornerRadius(10)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
                 }
-                .disabled(fullName.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(isLoading)
                 
-                if showError {
-                    Text("Por favor ingresa tu nombre")
-                        .foregroundColor(.red)
-                        .font(.caption)
+                if isLoading {
+                    ProgressView()
+                        .padding()
                 }
             }
             .padding(.horizontal, 40)
             
             Spacer()
+            
+            Text("Al continuar, aceptas nuestros términos y condiciones")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 20)
         }
         .padding()
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private func loginWithMicrosoft() {
+        isLoading = true
+        Task {
+            do {
+                try await authService.signInWithMicrosoft()
+            } catch {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+            isLoading = false
+        }
     }
 }
 

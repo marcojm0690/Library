@@ -30,6 +30,11 @@ public class MongoDbLibraryRepository : ILibraryRepository, IDisposable
             _database = _mongoClient.GetDatabase(databaseName);
             _collection = _database.GetCollection<MongoLibrary>(collectionName);
 
+            // Create index on UserId for user-scoped queries
+            var indexKeysDefinition = Builders<MongoLibrary>.IndexKeys.Ascending(l => l.UserId);
+            var indexModel = new CreateIndexModel<MongoLibrary>(indexKeysDefinition);
+            _collection.Indexes.CreateOneAsync(indexModel);
+
             _logger.LogInformation(
                 "MongoDB library repository initialized - Database: {Database}, Collection: {Collection}",
                 databaseName, collectionName);
@@ -81,6 +86,21 @@ public class MongoDbLibraryRepository : ILibraryRepository, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving libraries by owner: {Owner}", owner);
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<Library>> GetByUserIdAsync(Guid userId)
+    {
+        try
+        {
+            var filter = Builders<MongoLibrary>.Filter.Eq(l => l.UserId, userId);
+            var mongoLibraries = await _collection.Find(filter).ToListAsync();
+            return mongoLibraries.Select(ml => ml.ToLibrary());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving libraries by user ID: {UserId}", userId);
             throw;
         }
     }
@@ -238,6 +258,10 @@ internal class MongoLibrary
     [BsonElement("description")]
     public string? Description { get; set; }
 
+    [BsonElement("userId")]
+    [BsonRepresentation(BsonType.String)]
+    public Guid UserId { get; set; }
+
     [BsonElement("owner")]
     public string Owner { get; set; } = string.Empty;
 
@@ -264,6 +288,7 @@ internal class MongoLibrary
         Id = Id,
         Name = Name,
         Description = Description,
+        UserId = UserId,
         Owner = Owner,
         CreatedAt = CreatedAt,
         UpdatedAt = UpdatedAt,
@@ -278,6 +303,7 @@ internal class MongoLibrary
         Id = library.Id,
         Name = library.Name,
         Description = library.Description,
+        UserId = library.UserId,
         Owner = library.Owner,
         CreatedAt = library.CreatedAt,
         UpdatedAt = library.UpdatedAt,

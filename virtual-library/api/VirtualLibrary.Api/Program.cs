@@ -9,6 +9,9 @@ using VirtualLibrary.Api.Infrastructure.Cache;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 // Configure MongoDB GUID serialization to use standard representation
 BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
@@ -19,6 +22,33 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Configure JWT Authentication
+var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
+if (!string.IsNullOrEmpty(jwtSecretKey))
+{
+    var key = Encoding.UTF8.GetBytes(jwtSecretKey);
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(key)
+        };
+    });
+}
+
+builder.Services.AddAuthorization();
 
 // Register Redis cache service
 builder.Services.AddSingleton<RedisCacheService>();
@@ -64,6 +94,21 @@ if (!string.IsNullOrEmpty(connectionString))
 
         builder.Services.AddScoped<ILibraryRepository>(sp =>
             sp.GetRequiredService<MongoDbLibraryRepository>());
+
+        // Register user repository
+        builder.Services.AddScoped<MongoDbUserRepository>(sp =>
+            new MongoDbUserRepository(
+                sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
+
+        builder.Services.AddScoped<IUserRepository>(sp =>
+            sp.GetRequiredService<MongoDbUserRepository>());
+
+        // Register MongoDB database for dependency injection
+        builder.Services.AddSingleton<MongoDB.Driver.IMongoDatabase>(sp =>
+        {
+            var client = new MongoDB.Driver.MongoClient(connectionString);
+            return client.GetDatabase(databaseName);
+        });
 
         // Register seeder for development/testing
         builder.Services.AddScoped<MongoDbSeeder>();
@@ -139,6 +184,10 @@ app.UseExceptionHandler(errorApp =>
         });
     });
 });
+
+// Configure middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Seed in-memory repository with mock data in development
 if (app.Environment.IsDevelopment() && string.IsNullOrEmpty(connectionString))
