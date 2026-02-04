@@ -1,0 +1,130 @@
+name: Setup Azure OIDC
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  setup:
+    name: Setup OIDC and OAuth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (using existing credentials)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Service Principal for OIDC
+        id: create-sp
+        run: |
+          # Get repository info
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          # Create service principal
+          SP_NAME="gh-oidc-${REPO_NAME}"
+          
+          SP_OUTPUT=$(az ad sp create-for-rbac \
+            --name "$SP_NAME" \
+            --role Contributor \
+            --scopes /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+            --sdk-auth)
+          
+          APP_ID=$(echo $SP_OUTPUT | jq -r '.clientId')
+          OBJECT_ID=$(az ad sp show --id $APP_ID --query id -o tsv)
+          
+          echo "app-id=$APP_ID" >> $GITHUB_OUTPUT
+          echo "object-id=$OBJECT_ID" >> $GITHUB_OUTPUT
+
+      - name: Create Federated Credentials
+        run: |
+          APP_ID="${{ steps.create-sp.outputs.app-id }}"
+          REPO="${{ github.repository }}"
+          
+          # Main branch credential
+          az ad app federated-credential create \
+            --id $APP_ID \
+            --parameters '{
+              "name": "github-main",
+              "issuer": "https://token.actions.githubusercontent.com",
+              "subject": "repo:'"$REPO"':ref:refs/heads/main",
+              "audiences": ["api://AzureADTokenExchange"]
+            }'
+          
+          # Pull request credential
+          az ad app federated-credential create \
+            --id $APP_ID \
+            --parameters '{
+              "name": "github-pr",
+              "issuer": "https://token.actions.githubusercontent.com",
+              "subject": "repo:'"$REPO"':pull_request",
+              "audiences": ["api://AzureADTokenExchange"]
+            }'
+          
+          # Environment credential
+          az ad app federated-credential create \
+            --id $APP_ID \
+            --parameters '{
+              "name": "github-prod",
+              "issuer": "https://token.actions.githubusercontent.com",
+              "subject": "repo:'"$REPO"':environment:prod",
+              "audiences": ["api://AzureADTokenExchange"]
+            }'
+
+      - name: Register Microsoft.Graph Provider
+        run: |
+          az provider register --namespace Microsoft.Graph --wait
+
+      - name: Generate JWT Secret
+        id: jwt-secret
+        run: |
+          JWT_SECRET=$(openssl rand -base64 32)
+          echo "::add-mask::$JWT_SECRET"
+          echo "jwt-secret=$JWT_SECRET" >> $GITHUB_OUTPUT
+
+      - name: Deploy Infrastructure with OAuth
+        id: deploy-infra
+        run: |
+          az deployment group create \
+            --resource-group ${{ secrets.RESOURCE_GROUP || 'virtual-library-rg' }} \
+            --template-file infrastructure/main.bicep \
+            --parameters \
+              appName=virtual-library \
+              environment=prod \
+              jwtSecretKey="${{ steps.jwt-secret.outputs.jwt-secret }}" \
+            --query 'properties.outputs' -o json > outputs.json
+          
+          # Extract OAuth credentials from deployment
+          MICROSOFT_CLIENT_ID=$(jq -r '.microsoftClientId.value' outputs.json)
+          MICROSOFT_CLIENT_SECRET=$(jq -r '.microsoftClientSecret.value' outputs.json)
+          
+          echo "::add-mask::$MICROSOFT_CLIENT_SECRET"
+          echo "microsoft-client-id=$MICROSOFT_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "microsoft-client-secret=$MICROSOFT_CLIENT_SECRET" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## ✅ Azure Setup Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Required GitHub Secrets" >> $GITHUB_STEP_SUMMARY
+          echo "Add these secrets to your repository (Settings → Secrets and variables → Actions):" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Name | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`AZURE_CLIENT_ID\` | \`${{ steps.create-sp.outputs.app-id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`AZURE_TENANT_ID\` | \`${{ secrets.AZURE_TENANT_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`AZURE_SUBSCRIPTION_ID\` | \`${{ secrets.AZURE_SUBSCRIPTION_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`JWT_SECRET_KEY\` | (generated - see logs) |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`MICROSOFT_CLIENT_ID\` | \`${{ steps.deploy-infra.outputs.microsoft-client-id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`MICROSOFT_CLIENT_SECRET\` | (generated - see logs) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Add the above secrets to GitHub" >> $GITHUB_STEP_SUMMARY
+          echo "2. Run 'Deploy Infrastructure' workflow" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run 'Deploy API' workflow" >> $GITHUB_STEP_SUMMARY
+          echo "4. Update iOS app with API URL" >> $GITHUB_STEP_SUMMARY

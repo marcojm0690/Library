@@ -23,6 +23,11 @@ public interface ILibraryRepository
     Task<IEnumerable<Library>> GetByOwnerAsync(string owner);
 
     /// <summary>
+    /// Get libraries by user ID
+    /// </summary>
+    Task<IEnumerable<Library>> GetByUserIdAsync(Guid userId);
+
+    /// <summary>
     /// Create a new library
     /// </summary>
     Task<Library> CreateAsync(Library library);

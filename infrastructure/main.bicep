@@ -6,6 +6,20 @@ param environment string = 'prod'
 @description('Application name used for resource naming')
 param appName string = 'virtual-library'
 
+@secure()
+@description('JWT secret key for token generation')
+param jwtSecretKey string
+
+@description('Create new Azure AD app registration for OAuth (set to false to use existing)')
+param createAadApp bool = true
+
+@description('Microsoft OAuth Client ID (required if createAadApp is false)')
+param microsoftClientId string = ''
+
+@secure()
+@description('Microsoft OAuth Client Secret (required if createAadApp is false)')
+param microsoftClientSecret string = ''
+
 // Resource naming
 var acrName = '${replace(appName, '-', '')}acr'
 var cosmosAccountName = '${appName}-server'
@@ -250,6 +264,34 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'Azure__Translator__Region'
           value: location
         }
+        {
+          name: 'Jwt__SecretKey'
+          value: jwtSecretKey
+        }
+        {
+          name: 'Jwt__Issuer'
+          value: 'https://${webApp.properties.defaultHostName}'
+        }
+        {
+          name: 'Jwt__Audience'
+          value: 'https://${webApp.properties.defaultHostName}'
+        }
+        {
+          name: 'Jwt__ExpirationDays'
+          value: '30'
+        }
+        {
+          name: 'OAuth__Microsoft__ClientId'
+          value: createAadApp ? aadApp.outputs.clientId : microsoftClientId
+        }
+        {
+          name: 'OAuth__Microsoft__ClientSecret'
+          value: createAadApp ? aadApp.outputs.clientSecret : microsoftClientSecret
+        }
+        {
+          name: 'OAuth__Microsoft__RedirectUri'
+          value: 'https://${webApp.properties.defaultHostName}/api/auth/callback/microsoft'
+        }
       ]
       connectionStrings: [
         {
@@ -278,7 +320,14 @@ resource webAppContainerSettings 'Microsoft.Web/sites/config@2023-01-01' = {
   }
 }
 
-
+// Create Azure AD app registration for OAuth (optional)
+module aadApp './aad-app.bicep' = if (createAadApp) {
+  name: 'aad-app-deployment'
+  params: {
+    appName: appName
+    webAppUrl: 'https://${webApp.properties.defaultHostName}'
+  }
+}
 
 // Outputs
 output acrLoginServer string = acr.properties.loginServer
@@ -291,3 +340,5 @@ output redisHostName string = redis.properties.hostName
 output redisName string = redis.name
 output translatorEndpoint string = translator.properties.endpoint
 output translatorName string = translator.name
+output microsoftClientId string = createAadApp ? aadApp.outputs.clientId : microsoftClientId
+output microsoftClientSecret string = createAadApp ? aadApp.outputs.clientSecret : microsoftClientSecret

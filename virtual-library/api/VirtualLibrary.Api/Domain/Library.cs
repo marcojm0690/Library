@@ -22,7 +22,12 @@ public class Library
     public string? Description { get; set; }
 
     /// <summary>
-    /// Owner/creator of the library
+    /// User ID of the library owner (for user-scoped data)
+    /// </summary>
+    public Guid UserId { get; set; }
+
+    /// <summary>
+    /// Owner/creator of the library (legacy field for backward compatibility)
     /// </summary>
     public string Owner { get; set; } = string.Empty;
 

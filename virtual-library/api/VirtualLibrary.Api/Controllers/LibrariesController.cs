@@ -1,16 +1,19 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using VirtualLibrary.Api.Application.Abstractions;
 using VirtualLibrary.Api.Application.DTOs;
 using VirtualLibrary.Api.Domain;
 using VirtualLibrary.Api.Infrastructure;
 using VirtualLibrary.Api.Infrastructure.Cache;
 using VirtualLibrary.Api.Infrastructure.External;
+using System.Security.Claims;
 
 namespace VirtualLibrary.Api.Controllers;
 
 /// <summary>
 /// Controller for library management operations
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class LibrariesController : ControllerBase
@@ -41,31 +44,43 @@ public class LibrariesController : ControllerBase
         _logger = logger;
     }
 
+    private Guid GetAuthenticatedUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedAccessException("User ID not found in token");
+        }
+        return userId;
+    }
+
     /// <summary>
-    /// Get all libraries
+    /// Get all libraries for the authenticated user
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<LibraryResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<LibraryResponse>>> GetAll()
     {
-        var libraries = await _libraryRepository.GetAllAsync();
+        var userId = GetAuthenticatedUserId();
+        var libraries = await _libraryRepository.GetByUserIdAsync(userId);
         var responses = libraries.Select(MapToResponse);
         return Ok(responses);
     }
 
     /// <summary>
-    /// Get a library by ID
+    /// Get a library by ID (must belong to authenticated user)
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(LibraryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LibraryResponse>> GetById(Guid id)
     {
+        var userId = GetAuthenticatedUserId();
         var cacheKey = $"library:{id}";
         
         // Check cache first
         var cachedLibrary = await _cache.GetAsync<Library>(cacheKey);
-        if (cachedLibrary != null)
+        if (cachedLibrary != null && cachedLibrary.UserId == userId)
         {
             _logger.LogInformation("Cache hit for library {LibraryId}", id);
             return Ok(MapToResponse(cachedLibrary));
@@ -74,7 +89,7 @@ public class LibrariesController : ControllerBase
         _logger.LogInformation("Cache miss for library {LibraryId}", id);
         var library = await _libraryRepository.GetByIdAsync(id);
         
-        if (library == null)
+        if (library == null || library.UserId != userId)
         {
             return NotFound(new { message = $"Library with ID {id} not found" });
         }
@@ -129,16 +144,17 @@ public class LibrariesController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new library
+    /// Create a new library for authenticated user
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(LibraryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LibraryResponse>> Create([FromBody] CreateLibraryRequest request)
     {
-        _logger.LogInformation("🔵 Create library endpoint called");
-        _logger.LogInformation("🔵 Request: Name={Name}, Owner={Owner}, Tags={Tags}, IsPublic={IsPublic}", 
-            request.Name, request.Owner, request.Tags?.Count ?? 0, request.IsPublic);
+        var userId = GetAuthenticatedUserId();
+        _logger.LogInformation("🔵 Create library endpoint called for user {UserId}", userId);
+        _logger.LogInformation("🔵 Request: Name={Name}, Tags={Tags}, IsPublic={IsPublic}", 
+            request.Name, request.Tags?.Count ?? 0, request.IsPublic);
         
         if (string.IsNullOrWhiteSpace(request.Name))
         {
@@ -146,17 +162,12 @@ public class LibrariesController : ControllerBase
             return BadRequest(new { message = "Library name is required" });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Owner))
-        {
-            _logger.LogWarning("❌ Owner is empty");
-            return BadRequest(new { message = "Owner is required" });
-        }
-
         var library = new Library
         {
             Name = request.Name,
             Description = request.Description,
-            Owner = request.Owner,
+            UserId = userId,
+            Owner = User.FindFirst(ClaimTypes.Email)?.Value ?? "",
             Tags = request.Tags ?? new List<string>(),
             IsPublic = request.IsPublic,
             Type = request.Type
@@ -166,10 +177,10 @@ public class LibrariesController : ControllerBase
         var created = await _libraryRepository.CreateAsync(library);
         _logger.LogInformation("✅ Library created with ID: {LibraryId}", created.Id);
         
-        // Invalidate owner cache
-        var ownerCacheKey = $"libraries:owner:{request.Owner}";
-        await _cache.RemoveAsync(ownerCacheKey);
-        _logger.LogInformation("🔵 Invalidated cache for owner: {Owner}", request.Owner);
+        // Invalidate user cache
+        var userCacheKey = $"libraries:user:{userId}";
+        await _cache.RemoveAsync(userCacheKey);
+        _logger.LogInformation("🔵 Invalidated cache for user: {UserId}", userId);
         
         var response = MapToResponse(created);
 
@@ -177,16 +188,17 @@ public class LibrariesController : ControllerBase
     }
 
     /// <summary>
-    /// Update a library
+    /// Update a library (must belong to authenticated user)
     /// </summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(LibraryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LibraryResponse>> Update(Guid id, [FromBody] UpdateLibraryRequest request)
     {
+        var userId = GetAuthenticatedUserId();
         var existing = await _libraryRepository.GetByIdAsync(id);
         
-        if (existing == null)
+        if (existing == null || existing.UserId != userId)
         {
             return NotFound(new { message = $"Library with ID {id} not found" });
         }
@@ -205,21 +217,27 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches
-        await InvalidateLibraryCache(id, updated.Owner);
+        await InvalidateLibraryCache(id, updated.UserId);
 
         return Ok(MapToResponse(updated));
     }
 
     /// <summary>
-    /// Delete a library
+    /// Delete a library (must belong to authenticated user)
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Delete(Guid id)
     {
-        // Get library first to invalidate owner cache
+        var userId = GetAuthenticatedUserId();
+        // Get library first to check ownership and invalidate cache
         var library = await _libraryRepository.GetByIdAsync(id);
+        
+        if (library == null || library.UserId != userId)
+        {
+            return NotFound(new { message = $"Library with ID {id} not found" });
+        }
         
         var deleted = await _libraryRepository.DeleteAsync(id);
         
@@ -229,10 +247,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches
-        if (library != null)
-        {
-            await InvalidateLibraryCache(id, library.Owner);
-        }
+        await InvalidateLibraryCache(id, library.UserId);
 
         return NoContent();
     }
@@ -277,7 +292,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches since book count changed
-        await InvalidateLibraryCache(id, updated.Owner);
+        await InvalidateLibraryCache(id, updated.UserId);
 
         _logger.LogInformation("Successfully added {Count} books to library {LibraryId}", validBookIds.Count, id);
         return Ok(MapToResponse(updated));
@@ -481,7 +496,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches since book count changed
-        await InvalidateLibraryCache(id, updated.Owner);
+        await InvalidateLibraryCache(id, updated.UserId);
 
         return Ok(MapToResponse(updated));
     }
@@ -1061,18 +1076,18 @@ public class LibrariesController : ControllerBase
     /// <summary>
     /// Invalidate library cache when data changes
     /// </summary>
-    private async Task InvalidateLibraryCache(Guid libraryId, string owner)
+    private async Task InvalidateLibraryCache(Guid libraryId, Guid userId)
     {
         // Remove individual library cache
         await _cache.RemoveAsync($"library:{libraryId}");
         
-        // Remove owner's libraries cache
-        await _cache.RemoveAsync($"libraries:owner:{owner}");
+        // Remove user's libraries cache
+        await _cache.RemoveAsync($"libraries:user:{userId}");
         
         // Remove vocabulary cache since library content changed
-        await _cache.RemoveAsync($"vocabulary:owner:{owner}");
+        await _cache.RemoveAsync($"vocabulary:user:{userId}");
         
-        _logger.LogInformation("Invalidated cache for library {LibraryId} and owner {Owner}", libraryId, owner);
+        _logger.LogInformation("Invalidated cache for library {LibraryId} and user {UserId}", libraryId, userId);
     }
 
     private static LibraryResponse MapToResponse(Library library) => new()
