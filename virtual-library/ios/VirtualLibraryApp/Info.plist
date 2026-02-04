@@ -58,6 +58,17 @@
 	<string>Virtual Library needs access to speech recognition to let you search for books by voice. Just say the book title or author name.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Virtual Library needs microphone access to listen to your voice when searching for books using voice search.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>virtuallibrary</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.virtuallibrary.app</string>
+		</dict>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

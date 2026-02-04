@@ -10,15 +10,12 @@ param appName string = 'virtual-library'
 @description('JWT secret key for token generation')
 param jwtSecretKey string
 
-@description('Create new Azure AD app registration for OAuth (set to false to use existing)')
-param createAadApp bool = true
-
-@description('Microsoft OAuth Client ID (required if createAadApp is false)')
-param microsoftClientId string = ''
+@description('Microsoft OAuth Client ID (from Azure AD app registration)')
+param microsoftClientId string
 
 @secure()
-@description('Microsoft OAuth Client Secret (required if createAadApp is false)')
-param microsoftClientSecret string = ''
+@description('Microsoft OAuth Client Secret (from Azure AD app registration)')
+param microsoftClientSecret string
 
 // Resource naming
 var acrName = '${replace(appName, '-', '')}acr'
@@ -30,6 +27,7 @@ var cosmosDbName = 'LibraryDb'
 var cosmosDbCollection = 'Books'
 var redisName = '${appName}-redis-${environment}'
 var translatorName = '${appName}-translator-${environment}-${uniqueString(resourceGroup().id)}'
+var webAppUrl = 'https://${webAppName}.azurewebsites.net'
 
 // Create Virtual Network for private endpoints
 resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
@@ -270,11 +268,11 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'Jwt__Issuer'
-          value: 'https://${webApp.properties.defaultHostName}'
+          value: webAppUrl
         }
         {
           name: 'Jwt__Audience'
-          value: 'https://${webApp.properties.defaultHostName}'
+          value: webAppUrl
         }
         {
           name: 'Jwt__ExpirationDays'
@@ -282,15 +280,15 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'OAuth__Microsoft__ClientId'
-          value: createAadApp ? aadApp.outputs.clientId : microsoftClientId
+          value: microsoftClientId
         }
         {
           name: 'OAuth__Microsoft__ClientSecret'
-          value: createAadApp ? aadApp.outputs.clientSecret : microsoftClientSecret
+          value: microsoftClientSecret
         }
         {
           name: 'OAuth__Microsoft__RedirectUri'
-          value: 'https://${webApp.properties.defaultHostName}/api/auth/callback/microsoft'
+          value: '${webAppUrl}/api/auth/callback/microsoft'
         }
       ]
       connectionStrings: [
@@ -320,19 +318,10 @@ resource webAppContainerSettings 'Microsoft.Web/sites/config@2023-01-01' = {
   }
 }
 
-// Create Azure AD app registration for OAuth (optional)
-module aadApp './aad-app.bicep' = if (createAadApp) {
-  name: 'aad-app-deployment'
-  params: {
-    appName: appName
-    webAppUrl: 'https://${webApp.properties.defaultHostName}'
-  }
-}
-
 // Outputs
 output acrLoginServer string = acr.properties.loginServer
 output acrName string = acr.name
-output webAppUrl string = 'https://${webApp.properties.defaultHostName}'
+output webAppUrl string = webAppUrl
 output cosmosDbEndpoint string = cosmosAccount.properties.documentEndpoint
 output webAppName string = webApp.name
 output webAppPrincipalId string = webApp.identity.principalId
@@ -340,5 +329,3 @@ output redisHostName string = redis.properties.hostName
 output redisName string = redis.name
 output translatorEndpoint string = translator.properties.endpoint
 output translatorName string = translator.name
-output microsoftClientId string = createAadApp ? aadApp.outputs.clientId : microsoftClientId
-output microsoftClientSecret string = createAadApp ? aadApp.outputs.clientSecret : microsoftClientSecret
