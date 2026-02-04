@@ -3,7 +3,7 @@ import SwiftUI
 /// Main home screen of the Virtual Library app.
 /// Provides navigation to ISBN scanning and cover scanning features.
 struct HomeView: View {
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject private var authService: AuthenticationService
     @State private var showCreateLibrary = false
     @State private var showVoiceSearch = false
     @State private var showLibraryPicker = false

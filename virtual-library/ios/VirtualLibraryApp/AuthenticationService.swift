@@ -9,7 +9,8 @@ final class AuthenticationService: NSObject, ObservableObject {
     @Published var jwtToken: String? = nil
     
     private var webAuthSession: ASWebAuthenticationSession?
-    private let apiBaseURL = "YOUR_API_URL_HERE" // Replace with actual API URL
+    private let apiBaseURL = "https://virtual-library-api-web.azurewebsites.net"
+    private let customScheme = "virtuallibrary"
     
     override init() {
         super.init()
@@ -17,42 +18,39 @@ final class AuthenticationService: NSObject, ObservableObject {
     }
     
     /// Sign in with Microsoft OAuth
-    func signInWithMicrosoft() async throws {
-        // Get OAuth configuration from API
-        guard let configURL = URL(string: "\(apiBaseURL)/api/auth/config") else {
-            throw AuthError.invalidURL
-        }
+    nonisolated func signInWithMicrosoft() async throws {
+        // Build Microsoft authorization URL
+        let clientId = "bdf237d4-29e4-44fb-9927-822f24961766"
+        let redirectUri = "\(apiBaseURL)/api/auth/callback/microsoft/mobile"
+        let state = UUID().uuidString
         
-        let (configData, _) = try await URLSession.shared.data(from: configURL)
-        let config = try JSONDecoder().decode(OAuthConfig.self, from: configData)
-        
-        // Build authorization URL
-        var components = URLComponents(string: config.microsoft.authorizeUrl)!
+        var components = URLComponents(string: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize")!
         components.queryItems = [
-            URLQueryItem(name: "client_id", value: config.microsoft.clientId),
-            URLQueryItem(name: "redirect_uri", value: config.microsoft.redirectUri),
+            URLQueryItem(name: "client_id", value: clientId),
+            URLQueryItem(name: "redirect_uri", value: redirectUri),
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: config.microsoft.scope),
-            URLQueryItem(name: "response_mode", value: "query")
+            URLQueryItem(name: "response_mode", value: "query"),
+            URLQueryItem(name: "scope", value: "openid profile email User.Read"),
+            URLQueryItem(name: "state", value: state)
         ]
         
         guard let authURL = components.url else {
             throw AuthError.invalidURL
         }
         
-        // Perform web authentication
-        let code = try await performWebAuth(url: authURL, redirectUri: config.microsoft.redirectUri)
+        // Start web authentication session
+        let token = try await performWebAuth(url: authURL, callbackScheme: customScheme)
         
-        // Exchange code for JWT token
-        try await exchangeCodeForToken(code: code)
+        // Parse JWT to get user info
+        try await processToken(token)
     }
     
-    private func performWebAuth(url: URL, redirectUri: String) async throws -> String {
+    private func performWebAuth(url: URL, callbackScheme: String) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.main.async { [weak self] in
                 self?.webAuthSession = ASWebAuthenticationSession(
                     url: url,
-                    callbackURLScheme: URL(string: redirectUri)!.scheme
+                    callbackURLScheme: callbackScheme
                 ) { callbackURL, error in
                     if let error = error {
                         continuation.resume(throwing: error)
@@ -60,49 +58,70 @@ final class AuthenticationService: NSObject, ObservableObject {
                     }
                     
                     guard let callbackURL = callbackURL,
-                          let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
-                          let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
-                        continuation.resume(throwing: AuthError.noAuthorizationCode)
+                          let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+                        continuation.resume(throwing: AuthError.noToken)
                         return
                     }
                     
-                    continuation.resume(returning: code)
+                    // Check for error parameter
+                    if let errorParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
+                        continuation.resume(throwing: AuthError.serverError(errorParam))
+                        return
+                    }
+                    
+                    // Get token parameter
+                    guard let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+                        continuation.resume(throwing: AuthError.noToken)
+                        return
+                    }
+                    
+                    continuation.resume(returning: token)
                 }
                 
                 self?.webAuthSession?.presentationContextProvider = self
+                self?.webAuthSession?.prefersEphemeralWebBrowserSession = false
                 self?.webAuthSession?.start()
             }
         }
     }
     
-    private func exchangeCodeForToken(code: String) async throws {
-        guard let url = URL(string: "\(apiBaseURL)/api/auth/oauth/microsoft") else {
-            throw AuthError.invalidURL
+    private func processToken(_ token: String) async throws {
+        // Decode JWT to get user info (basic decode without verification for display)
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else {
+            throw AuthError.invalidToken
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Decode payload (second part)
+        var payload = String(parts[1])
+        // Add padding if needed
+        let remainder = payload.count % 4
+        if remainder > 0 {
+            payload += String(repeating: "=", count: 4 - remainder)
+        }
         
-        let body = ["code": code]
-        request.httpBody = try JSONEncoder().encode(body)
+        guard let data = Data(base64Encoded: payload.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let userId = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] as? String,
+              let email = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] as? String else {
+            throw AuthError.invalidToken
+        }
         
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let response = try JSONDecoder().decode(AuthResponse.self, from: data)
+        let displayName = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as? String
         
-        // Store token and user
+        // Store token and user info
         await MainActor.run {
-            self.jwtToken = response.token
+            self.jwtToken = token
             self.user = User(
-                id: response.user.id,
-                fullName: response.user.displayName ?? response.user.email,
-                email: response.user.email
+                id: userId,
+                fullName: displayName ?? email,
+                email: email
             )
             self.isAuthenticated = true
         }
         
         // Save to keychain
-        saveAuthToKeychain(token: response.token, userId: response.user.id)
+        saveAuthToKeychain(token: token, userId: userId)
     }
     
     private func loadStoredAuth() {
@@ -199,31 +218,22 @@ extension AuthenticationService: ASWebAuthenticationPresentationContextProviding
     }
 }
 
-// MARK: - Models
-struct OAuthConfig: Codable {
-    let microsoft: MicrosoftConfig
-    
-    struct MicrosoftConfig: Codable {
-        let clientId: String
-        let redirectUri: String
-        let authorizeUrl: String
-        let scope: String
-    }
-}
-
-struct AuthResponse: Codable {
-    let token: String
-    let user: UserInfo
-}
-
-struct UserInfo: Codable {
-    let id: String
-    let email: String
-    let displayName: String?
-    let profilePictureUrl: String?
-}
-
 enum AuthError: Error {
     case invalidURL
-    case noAuthorizationCode
+    case noToken
+    case invalidToken
+    case serverError(String)
+    
+    var localizedDescription: String {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL"
+        case .noToken:
+            return "No token received from server"
+        case .invalidToken:
+            return "Invalid token format"
+        case .serverError(let message):
+            return "Server error: \(message)"
+        }
+    }
 }

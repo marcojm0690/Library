@@ -2,7 +2,7 @@ import SwiftUI
 
 /// View for creating a new library
 struct CreateLibraryView: View {
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject private var authService: AuthenticationService
     @StateObject private var viewModel: CreateLibraryViewModel
     @Environment(\.dismiss) private var dismiss
     

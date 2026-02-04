@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LibrarySelectionForScanView: View {
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject private var authService: AuthenticationService
     @ObservedObject private var viewModel = LibrariesListViewModel()
     @State private var showCreateLibrary = false
     
