@@ -262,7 +262,7 @@ public class MongoDbBookRepository : IBookRepository, IDisposable
             return new MongoBook
             {
                 Id = book.Id,
-                Isbn = book.Isbn,
+                Isbn = book.Isbn ?? string.Empty,
                 Title = book.Title,
                 Authors = book.Authors.ToList(),
                 Publisher = book.Publisher,

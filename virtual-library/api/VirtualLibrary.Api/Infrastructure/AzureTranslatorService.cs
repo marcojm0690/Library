@@ -64,20 +64,23 @@ public class AzureTranslatorService : ITranslatorService
             // Parse the response
             var translationResults = JsonSerializer.Deserialize<TranslationResult[]>(result);
             
-            if (translationResults != null && translationResults.Length > 0 && 
-                translationResults[0].Translations != null && translationResults[0].Translations.Length > 0)
+            if (translationResults != null && translationResults.Length > 0)
             {
-                var translatedText = translationResults[0].Translations[0].Text;
-                
-                // Log detected language for debugging
-                var detectedLanguage = translationResults[0].DetectedLanguage?.Language ?? "unknown";
-                if (detectedLanguage != "en")
+                var firstResult = translationResults[0];
+                if (firstResult?.Translations != null && firstResult.Translations.Length > 0)
                 {
-                    _logger.LogInformation("Translated '{Original}' ({Language}) to '{Translated}'", 
-                        text, detectedLanguage, translatedText);
+                    var translatedText = firstResult.Translations[0].Text;
+                    
+                    // Log detected language for debugging
+                    var detectedLanguage = firstResult.DetectedLanguage?.Language ?? "unknown";
+                    if (detectedLanguage != "en")
+                    {
+                        _logger.LogInformation("Translated '{Original}' ({Language}) to '{Translated}'", 
+                            text, detectedLanguage, translatedText);
+                    }
+                    
+                    return translatedText;
                 }
-                
-                return translatedText;
             }
             
             _logger.LogWarning("Translation API returned empty result for '{Text}'", text);
