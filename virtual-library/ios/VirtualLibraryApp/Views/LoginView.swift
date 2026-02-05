@@ -3,7 +3,7 @@ import AuthenticationServices
 
 /// Login view with Microsoft OAuth
 struct LoginView: View {
-    @EnvironmentObject private var authService: AuthenticationService
+    @EnvironmentObject var authService: AuthenticationService
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLoading = false
@@ -32,7 +32,7 @@ struct LoginView: View {
             VStack(spacing: 20) {
                 Button(action: loginWithMicrosoft) {
                     HStack {
-                        Image(systemName: "microsoft.logo")
+                        Image(systemName: "person.crop.circle.fill")
                             .font(.title3)
                         Text("Continuar con Microsoft")
                             .fontWeight(.semibold)
@@ -71,11 +71,17 @@ struct LoginView: View {
     }
     
     private func loginWithMicrosoft() {
-        // Using existing local sign-in API from AuthenticationService.
-        // Replace this with real Microsoft OAuth later if desired.
+        let authenticationService = _authService.wrappedValue
         isLoading = true
-        authService.signIn(fullName: "Usuario", email: nil)
-        isLoading = false
+        Task { @MainActor in
+            do {
+                try await authenticationService.signInWithMicrosoft()
+            } catch {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+            isLoading = false
+        }
     }
 }
 

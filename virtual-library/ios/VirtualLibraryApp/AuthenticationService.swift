@@ -3,7 +3,7 @@ import Combine
 import AuthenticationServices
 
 /// OAuth authentication service for Microsoft
-final class AuthenticationService: NSObject, ObservableObject {
+class AuthenticationService: NSObject, ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var user: User? = nil
     @Published var jwtToken: String? = nil
@@ -18,7 +18,7 @@ final class AuthenticationService: NSObject, ObservableObject {
     }
     
     /// Sign in with Microsoft OAuth
-    nonisolated func signInWithMicrosoft() async throws {
+    func signInWithMicrosoft() async throws {
         // Build Microsoft authorization URL
         let clientId = "bdf237d4-29e4-44fb-9927-822f24961766"
         let redirectUri = "\(apiBaseURL)/api/auth/callback/microsoft/mobile"
@@ -53,28 +53,40 @@ final class AuthenticationService: NSObject, ObservableObject {
                     callbackURLScheme: callbackScheme
                 ) { callbackURL, error in
                     if let error = error {
+                        print("❌ ASWebAuthenticationSession error: \(error.localizedDescription)")
                         continuation.resume(throwing: error)
                         return
                     }
                     
-                    guard let callbackURL = callbackURL,
-                          let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+                    guard let callbackURL = callbackURL else {
+                        print("❌ No callback URL received")
+                        continuation.resume(throwing: AuthError.noToken)
+                        return
+                    }
+                    
+                    print("✅ Callback URL received: \(callbackURL.absoluteString)")
+                    
+                    guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+                        print("❌ Failed to parse callback URL")
                         continuation.resume(throwing: AuthError.noToken)
                         return
                     }
                     
                     // Check for error parameter
                     if let errorParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
+                        print("❌ Server returned error: \(errorParam)")
                         continuation.resume(throwing: AuthError.serverError(errorParam))
                         return
                     }
                     
                     // Get token parameter
                     guard let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+                        print("❌ No token in callback URL. Query items: \(components.queryItems ?? [])")
                         continuation.resume(throwing: AuthError.noToken)
                         return
                     }
                     
+                    print("✅ Token received successfully")
                     continuation.resume(returning: token)
                 }
                 

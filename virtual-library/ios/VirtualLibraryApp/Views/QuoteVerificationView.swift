@@ -72,6 +72,16 @@ struct QuoteVerificationView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .sheet(isPresented: $showPhotoInput) {
+            ImagePicker(image: $selectedImage, sourceType: .photoLibrary)
+        }
+        .onChange(of: selectedImage) { _, newImage in
+            if let image = newImage {
+                Task {
+                    await viewModel.extractTextFromImage(image)
+                }
+            }
+        }
     }
     
     // MARK: - Computed Properties

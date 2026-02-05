@@ -157,8 +157,9 @@ public class AuthController : ControllerBase
                 return Redirect("virtuallibrary://oauth-complete?error=no_code");
             }
 
-            // Exchange authorization code for access token
-            var tokenResponse = await ExchangeCodeForTokenAsync(code);
+            // Exchange authorization code for access token - use mobile redirect URI
+            var mobileRedirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback/microsoft/mobile";
+            var tokenResponse = await ExchangeCodeForTokenAsync(code, mobileRedirectUri);
             if (tokenResponse == null)
             {
                 return Redirect("virtuallibrary://oauth-complete?error=token_exchange_failed");
@@ -204,11 +205,11 @@ public class AuthController : ControllerBase
         }
     }
 
-    private async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code)
+    private async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code, string? overrideRedirectUri = null)
     {
         var clientId = _configuration["OAuth:Microsoft:ClientId"];
         var clientSecret = _configuration["OAuth:Microsoft:ClientSecret"];
-        var redirectUri = _configuration["OAuth:Microsoft:RedirectUri"];
+        var redirectUri = overrideRedirectUri ?? _configuration["OAuth:Microsoft:RedirectUri"];
 
         var tokenEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -219,6 +220,8 @@ public class AuthController : ControllerBase
             ["redirect_uri"] = redirectUri!,
             ["grant_type"] = "authorization_code"
         });
+
+        _logger.LogInformation("Exchanging code for token with redirect_uri: {RedirectUri}", redirectUri);
 
         var response = await _httpClient.PostAsync(tokenEndpoint, content);
         if (!response.IsSuccessStatusCode)
