@@ -157,8 +157,12 @@ public class AuthController : ControllerBase
                 return Redirect("virtuallibrary://oauth-complete?error=no_code");
             }
 
-            // Exchange authorization code for access token - use mobile redirect URI
-            var mobileRedirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback/microsoft/mobile";
+            // Exchange authorization code for access token - use the exact mobile redirect URI
+            // This MUST match exactly what the iOS app sent in the authorization request
+            var mobileRedirectUri = "https://virtual-library-api-web.azurewebsites.net/api/auth/callback/microsoft/mobile";
+            
+            _logger.LogInformation("Mobile OAuth callback - using redirect URI: {RedirectUri}", mobileRedirectUri);
+            
             var tokenResponse = await ExchangeCodeForTokenAsync(code, mobileRedirectUri);
             if (tokenResponse == null)
             {
