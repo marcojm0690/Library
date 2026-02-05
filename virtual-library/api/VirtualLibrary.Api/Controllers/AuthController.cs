@@ -67,10 +67,10 @@ public class AuthController : ControllerBase
             }
 
             // Get user info from Microsoft Graph
-            var userInfo = await GetMicrosoftUserInfoAsync(tokenResponse.AccessToken);
+            var (userInfo, graphError) = await GetMicrosoftUserInfoAsync(tokenResponse.AccessToken);
             if (userInfo == null)
             {
-                return BadRequest(new { error = "Failed to get user information" });
+                return BadRequest(new { error = "Failed to get user information", details = graphError });
             }
 
             // Find or create user
@@ -171,10 +171,11 @@ public class AuthController : ControllerBase
             }
 
             // Get user info from Microsoft Graph
-            var userInfo = await GetMicrosoftUserInfoAsync(tokenResponse.AccessToken);
+            var (userInfo, graphError) = await GetMicrosoftUserInfoAsync(tokenResponse.AccessToken);
             if (userInfo == null)
             {
-                return Redirect("virtuallibrary://oauth-complete?error=user_info_failed");
+                var errorMsg = Uri.EscapeDataString(graphError ?? "unknown_error");
+                return Redirect($"virtuallibrary://oauth-complete?error=user_info_failed&details={errorMsg}");
             }
 
             // Find or create user
@@ -244,7 +245,7 @@ public class AuthController : ControllerBase
         return (token, null);
     }
 
-    private async Task<MicrosoftUserInfo?> GetMicrosoftUserInfoAsync(string accessToken)
+    private async Task<(MicrosoftUserInfo? UserInfo, string? Error)> GetMicrosoftUserInfoAsync(string accessToken)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me");
         request.Headers.Add("Authorization", $"Bearer {accessToken}");
@@ -254,14 +255,15 @@ public class AuthController : ControllerBase
         {
             var error = await response.Content.ReadAsStringAsync();
             _logger.LogError("Failed to get user info: {Error}", error);
-            return null;
+            return (null, error);
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<MicrosoftUserInfo>(json, new JsonSerializerOptions
+        var userInfo = JsonSerializer.Deserialize<MicrosoftUserInfo>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         });
+        return (userInfo, null);
     }
 
     private string GenerateJwtToken(User user)
