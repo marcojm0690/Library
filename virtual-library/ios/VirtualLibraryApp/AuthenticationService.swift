@@ -74,8 +74,10 @@ class AuthenticationService: NSObject, ObservableObject {
                     
                     // Check for error parameter
                     if let errorParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
+                        let details = components.queryItems?.first(where: { $0.name == "details" })?.value ?? "no details"
                         print("❌ Server returned error: \(errorParam)")
-                        continuation.resume(throwing: AuthError.serverError(errorParam))
+                        print("❌ Error details: \(details)")
+                        continuation.resume(throwing: AuthError.serverError("\(errorParam): \(details)"))
                         return
                     }
                     
