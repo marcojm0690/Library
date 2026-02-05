@@ -60,10 +60,10 @@ public class AuthController : ControllerBase
         try
         {
             // Exchange authorization code for access token
-            var tokenResponse = await ExchangeCodeForTokenAsync(request.Code);
+            var (tokenResponse, tokenError) = await ExchangeCodeForTokenAsync(request.Code);
             if (tokenResponse == null)
             {
-                return BadRequest(new { error = "Failed to exchange authorization code" });
+                return BadRequest(new { error = "Failed to exchange authorization code", details = tokenError });
             }
 
             // Get user info from Microsoft Graph
@@ -163,10 +163,11 @@ public class AuthController : ControllerBase
             
             _logger.LogInformation("Mobile OAuth callback - using redirect URI: {RedirectUri}", mobileRedirectUri);
             
-            var tokenResponse = await ExchangeCodeForTokenAsync(code, mobileRedirectUri);
+            var (tokenResponse, tokenError) = await ExchangeCodeForTokenAsync(code, mobileRedirectUri);
             if (tokenResponse == null)
             {
-                return Redirect("virtuallibrary://oauth-complete?error=token_exchange_failed");
+                var errorMsg = Uri.EscapeDataString(tokenError ?? "unknown_error");
+                return Redirect($"virtuallibrary://oauth-complete?error=token_exchange_failed&details={errorMsg}");
             }
 
             // Get user info from Microsoft Graph
@@ -209,7 +210,7 @@ public class AuthController : ControllerBase
         }
     }
 
-    private async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code, string? overrideRedirectUri = null)
+    private async Task<(TokenResponse? Token, string? Error)> ExchangeCodeForTokenAsync(string code, string? overrideRedirectUri = null)
     {
         var clientId = _configuration["OAuth:Microsoft:ClientId"];
         var clientSecret = _configuration["OAuth:Microsoft:ClientSecret"];
@@ -232,14 +233,15 @@ public class AuthController : ControllerBase
         {
             var error = await response.Content.ReadAsStringAsync();
             _logger.LogError("Token exchange failed: {Error}", error);
-            return null;
+            return (null, error);
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<TokenResponse>(json, new JsonSerializerOptions
+        var token = JsonSerializer.Deserialize<TokenResponse>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         });
+        return (token, null);
     }
 
     private async Task<MicrosoftUserInfo?> GetMicrosoftUserInfoAsync(string accessToken)
