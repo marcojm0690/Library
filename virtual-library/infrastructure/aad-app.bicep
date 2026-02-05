@@ -12,6 +12,7 @@ resource adApp 'Microsoft.Graph/applications@v1.0' = {
   web: {
     redirectUris: [
       '${webAppUrl}/api/auth/callback/microsoft'
+      '${webAppUrl}/api/auth/callback/microsoft/mobile' // Mobile app OAuth callback
       'msauth.com.virtualLibrary://auth' // iOS redirect
     ]
     implicitGrantSettings: {
