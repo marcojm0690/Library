@@ -11,7 +11,7 @@ class LibraryDetailViewModel: ObservableObject {
     private let apiService: BookApiService
     private var loadTask: Task<Void, Never>?  // Track the task to prevent cancellation
     
-    init(libraryId: UUID, apiService: BookApiService = BookApiService()) {
+    init(libraryId: UUID, apiService: BookApiService = BookApiService.shared) {
         self.libraryId = libraryId
         self.apiService = apiService
     }
@@ -27,10 +27,8 @@ class LibraryDetailViewModel: ObservableObject {
             
             do {
                 books = try await apiService.getBooksInLibrary(libraryId: libraryId)
-                print("✅ Loaded \(books.count) books for library: \(libraryId.uuidString)")
             } catch {
                 self.error = error.localizedDescription
-                print("❌ Failed to load books: \(error)")
             }
             
             isLoading = false
@@ -50,9 +48,7 @@ class LibraryDetailViewModel: ObservableObject {
             try await apiService.removeBooksFromLibrary(libraryId: libraryId, bookIds: [bookId])
             // Remove from local array on success
             books.removeAll { $0.id == bookId }
-            print("✅ Removed book \(bookId.uuidString) from library \(libraryId.uuidString)")
         } catch {
-            print("❌ Failed to remove book: \(error)")
             throw error
         }
     }

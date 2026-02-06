@@ -151,8 +151,7 @@ struct BookDetailView: View {
         isDeleting = true
         
         do {
-            let apiService = BookApiService()
-            try await apiService.removeBooksFromLibrary(libraryId: library.id, bookIds: [bookId])
+            try await BookApiService.shared.removeBooksFromLibrary(libraryId: library.id, bookIds: [bookId])
             dismiss()
         } catch {
             print("❌ Failed to remove book: \(error)")

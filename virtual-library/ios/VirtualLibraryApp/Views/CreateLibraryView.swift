@@ -103,10 +103,6 @@ struct CreateLibraryView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Create") {
                         Task {
-                            print("🔵 Create button tapped")
-                            print("🔵 User ID: \(authService.user?.id ?? "nil")")
-                            print("🔵 Library name: \(viewModel.name)")
-                            print("🔵 Is valid: \(viewModel.isValid)")
                             await createLibraryWithUser()
                         }
                     }
@@ -131,36 +127,30 @@ struct CreateLibraryView: View {
     }
     
     private func createLibraryWithUser() async {
-        print("🔵 createLibraryWithUser called")
-        
-        guard let userId = authService.user?.id else {
-            print("❌ No user ID found")
+        // Use email as owner to match backend expectations
+        guard let userEmail = authService.user?.email else {
             viewModel.error = "User not logged in"
             return
         }
         
-        print("✅ User ID: \(userId)")
+        // Ensure the shared API service has the auth token
+        if let token = authService.jwtToken {
+            BookApiService.shared.authToken = token
+        }
         
-        // Create new view model with user ID
-        let vm = CreateLibraryViewModel(userId: userId)
+        // Create new view model with user email as owner
+        let vm = CreateLibraryViewModel(userId: userEmail)
         vm.name = viewModel.name
         vm.description = viewModel.description
         vm.tags = viewModel.tags
         vm.isPublic = viewModel.isPublic
         vm.libraryType = viewModel.libraryType
         
-        print("🔵 Calling createLibrary...")
         await vm.createLibrary()
         
-        print("🔵 createLibrary finished")
-        print("🔵 Created library: \(vm.createdLibrary?.name ?? "nil")")
-        print("🔵 Error: \(vm.error ?? "nil")")
-        
         if vm.createdLibrary != nil {
-            print("✅ Library created successfully, dismissing view")
             dismiss()
         } else if let error = vm.error {
-            print("❌ Setting error: \(error)")
             viewModel.error = error
         }
     }

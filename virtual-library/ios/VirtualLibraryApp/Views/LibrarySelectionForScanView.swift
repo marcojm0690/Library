@@ -85,21 +85,21 @@ struct LibrarySelectionForScanView: View {
         .sheet(isPresented: $showCreateLibrary, onDismiss: {
             // Reload libraries after creating new one
             Task {
-                if let userId = authService.user?.id {
-                    await viewModel.refresh(for: userId)
+                if let userEmail = authService.user?.email {
+                    await viewModel.refresh(for: userEmail)
                 }
             }
         }) {
             CreateLibraryView()
         }
         .task {
-            if let userId = authService.user?.id {
-                await viewModel.loadLibraries(for: userId)
+            if let userEmail = authService.user?.email {
+                await viewModel.loadLibraries(for: userEmail)
             }
         }
         .refreshable {
-            if let userId = authService.user?.id {
-                await viewModel.refresh(for: userId)
+            if let userEmail = authService.user?.email {
+                await viewModel.refresh(for: userEmail)
             }
         }
     }

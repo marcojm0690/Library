@@ -17,7 +17,7 @@ class CreateLibraryViewModel: ObservableObject {
     private let apiService: BookApiService
     private let userId: String
     
-    init(userId: String, apiService: BookApiService = BookApiService()) {
+    init(userId: String, apiService: BookApiService = BookApiService.shared) {
         self.userId = userId
         self.apiService = apiService
     }
@@ -29,24 +29,10 @@ class CreateLibraryViewModel: ObservableObject {
     
     /// Add a tag to the list
     func addTag() {
-        print("🔵 addTag called with currentTag: '\(currentTag)'")
         let trimmed = currentTag.trimmingCharacters(in: .whitespaces)
-        print("🔵 Trimmed tag: '\(trimmed)'")
-        
-        guard !trimmed.isEmpty else {
-            print("❌ Tag is empty after trimming")
-            return
-        }
-        
-        guard !tags.contains(trimmed) else {
-            print("❌ Tag already exists: '\(trimmed)'")
-            return
-        }
-        
+        guard !trimmed.isEmpty, !tags.contains(trimmed) else { return }
         tags.append(trimmed)
         currentTag = ""
-        print("✅ Tag added successfully. Total tags: \(tags.count)")
-        print("✅ Tags: \(tags)")
     }
     
     /// Remove a tag from the list
@@ -75,10 +61,8 @@ class CreateLibraryViewModel: ObservableObject {
             )
             
             createdLibrary = try await apiService.createLibrary(request)
-            print("✅ Library created: \(createdLibrary?.name ?? "")")
         } catch {
             self.error = error.localizedDescription
-            print("❌ Failed to create library: \(error)")
         }
         
         isCreating = false

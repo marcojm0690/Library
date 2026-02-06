@@ -15,7 +15,7 @@ class QuoteVerificationViewModel: ObservableObject {
     private let apiService: BookApiService
     private let userId: String?
     
-    init(userId: String? = nil, apiService: BookApiService = BookApiService()) {
+    init(userId: String? = nil, apiService: BookApiService = BookApiService.shared) {
         self.userId = userId
         self.apiService = apiService
     }

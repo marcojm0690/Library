@@ -177,10 +177,12 @@ public class LibrariesController : ControllerBase
         var created = await _libraryRepository.CreateAsync(library);
         _logger.LogInformation("✅ Library created with ID: {LibraryId}", created.Id);
         
-        // Invalidate user cache
+        // Invalidate caches - both by userId and by owner (email)
         var userCacheKey = $"libraries:user:{userId}";
+        var ownerCacheKey = $"libraries:owner:{created.Owner}";
         await _cache.RemoveAsync(userCacheKey);
-        _logger.LogInformation("🔵 Invalidated cache for user: {UserId}", userId);
+        await _cache.RemoveAsync(ownerCacheKey);
+        _logger.LogInformation("🔵 Invalidated cache for user: {UserId} and owner: {Owner}", userId, created.Owner);
         
         var response = MapToResponse(created);
 
@@ -217,7 +219,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches
-        await InvalidateLibraryCache(id, updated.UserId);
+        await InvalidateLibraryCache(id, updated.UserId, updated.Owner);
 
         return Ok(MapToResponse(updated));
     }
@@ -247,7 +249,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches
-        await InvalidateLibraryCache(id, library.UserId);
+        await InvalidateLibraryCache(id, library.UserId, library.Owner);
 
         return NoContent();
     }
@@ -292,7 +294,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches since book count changed
-        await InvalidateLibraryCache(id, updated.UserId);
+        await InvalidateLibraryCache(id, updated.UserId, updated.Owner);
 
         _logger.LogInformation("Successfully added {Count} books to library {LibraryId}", validBookIds.Count, id);
         return Ok(MapToResponse(updated));
@@ -496,7 +498,7 @@ public class LibrariesController : ControllerBase
         }
 
         // Invalidate caches since book count changed
-        await InvalidateLibraryCache(id, updated.UserId);
+        await InvalidateLibraryCache(id, updated.UserId, updated.Owner);
 
         return Ok(MapToResponse(updated));
     }
@@ -1076,7 +1078,7 @@ public class LibrariesController : ControllerBase
     /// <summary>
     /// Invalidate library cache when data changes
     /// </summary>
-    private async Task InvalidateLibraryCache(Guid libraryId, Guid userId)
+    private async Task InvalidateLibraryCache(Guid libraryId, Guid userId, string? owner = null)
     {
         // Remove individual library cache
         await _cache.RemoveAsync($"library:{libraryId}");
@@ -1084,10 +1086,16 @@ public class LibrariesController : ControllerBase
         // Remove user's libraries cache
         await _cache.RemoveAsync($"libraries:user:{userId}");
         
+        // Remove owner's libraries cache (by email)
+        if (!string.IsNullOrEmpty(owner))
+        {
+            await _cache.RemoveAsync($"libraries:owner:{owner}");
+        }
+        
         // Remove vocabulary cache since library content changed
         await _cache.RemoveAsync($"vocabulary:user:{userId}");
         
-        _logger.LogInformation("Invalidated cache for library {LibraryId} and user {UserId}", libraryId, userId);
+        _logger.LogInformation("Invalidated cache for library {LibraryId}, user {UserId}, owner {Owner}", libraryId, userId, owner ?? "N/A");
     }
 
     private static LibraryResponse MapToResponse(Library library) => new()

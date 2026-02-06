@@ -13,7 +13,7 @@ class ScanCoverViewModel: ObservableObject {
     private let apiService: BookApiService
     private let ocrService: OCRService
     
-    init(apiService: BookApiService = BookApiService(), ocrService: OCRService = OCRService()) {
+    init(apiService: BookApiService = BookApiService.shared, ocrService: OCRService = OCRService()) {
         self.apiService = apiService
         self.ocrService = ocrService
     }

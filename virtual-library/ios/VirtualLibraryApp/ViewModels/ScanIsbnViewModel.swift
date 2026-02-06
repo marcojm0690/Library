@@ -11,7 +11,7 @@ class ScanIsbnViewModel: ObservableObject {
     
     private let apiService: BookApiService
     
-    init(apiService: BookApiService = BookApiService()) {
+    init(apiService: BookApiService = BookApiService.shared) {
         self.apiService = apiService
     }
     

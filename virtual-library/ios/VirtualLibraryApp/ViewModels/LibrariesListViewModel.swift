@@ -9,24 +9,33 @@ class LibrariesListViewModel: ObservableObject {
     
     private let apiService: BookApiService
     
-    init(apiService: BookApiService = BookApiService()) {
+    init(apiService: BookApiService = BookApiService.shared) {
         self.apiService = apiService
+    }
+    
+    /// Set the authentication token for API requests (optional if using shared service)
+    func setAuthToken(_ token: String?) {
+        apiService.authToken = token
     }
     
     /// Load libraries for the current user
     func loadLibraries(for userId: String) async {
+        print("🔵 [LibrariesListViewModel] loadLibraries called for: \(userId)")
+        
         isLoading = true
         error = nil
         
         do {
-            libraries = try await apiService.getLibrariesByOwner(userId)
-            print("✅ Loaded \(libraries.count) libraries for user: \(userId)")
+            let result = try await apiService.getLibrariesByOwner(userId)
+            print("🔵 [LibrariesListViewModel] Got \(result.count) libraries, updating UI")
+            libraries = result
+            print("🔵 [LibrariesListViewModel] libraries array now has \(libraries.count) items")
         } catch let urlError as URLError where urlError.code == .cancelled {
             // Request was cancelled (view dismissed), ignore
-            print("ℹ️ Library load cancelled")
+            print("🔵 [LibrariesListViewModel] URL request cancelled")
         } catch {
+            print("❌ [LibrariesListViewModel] Error: \(error)")
             self.error = error.localizedDescription
-            print("❌ Failed to load libraries: \(error)")
         }
         
         isLoading = false
@@ -43,9 +52,7 @@ class LibrariesListViewModel: ObservableObject {
             try await apiService.deleteLibrary(libraryId: library.id)
             // Remove from local array on success
             libraries.removeAll { $0.id == library.id }
-            print("✅ Deleted library \(library.name) (\(library.id.uuidString))")
         } catch {
-            print("❌ Failed to delete library: \(error)")
             throw error
         }
     }

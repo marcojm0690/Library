@@ -54,7 +54,7 @@ class VoiceSearchViewModel: ObservableObject {
         // Construct defaults on the main actor to avoid calling actor-isolated initializers
         // from a nonisolated default parameter context.
         self.speechService = speechService ?? SpeechRecognitionService()
-        self.apiService = apiService ?? BookApiService()
+        self.apiService = apiService ?? BookApiService.shared
     }
     
     // MARK: - Voice Search Flow

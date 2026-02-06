@@ -35,8 +35,10 @@ struct HomeView: View {
                     // Featured Voice Search
                     Button(action: {
                         Task {
-                            if let userId = authService.user?.id {
-                                await librariesViewModel.loadLibraries(for: userId)
+                            if let userEmail = authService.user?.email,
+                               let token = authService.jwtToken {
+                                librariesViewModel.setAuthToken(token)
+                                await librariesViewModel.loadLibraries(for: userEmail)
                             }
                         }
                         showLibraryPicker = true
@@ -179,11 +181,8 @@ struct HomeView: View {
                 QuoteVerificationView(userId: authService.user?.id)
                     .environmentObject(authService)
             }
-            .task {
-                if let userId = authService.user?.id {
-                    await librariesViewModel.loadLibraries(for: userId)
-                }
-            }
+            // Removed pre-loading libraries here to avoid duplicate API calls
+            // Libraries are loaded in LibrariesListView when needed
         }
     }
 }

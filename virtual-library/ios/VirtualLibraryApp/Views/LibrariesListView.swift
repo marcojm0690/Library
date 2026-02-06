@@ -30,14 +30,19 @@ struct LibrariesListView: View {
     }
     
     var body: some View {
+        let _ = print("🔵 [LibrariesListView] body called - isLoading: \(viewModel.isLoading), libraries count: \(viewModel.libraries.count), error: \(viewModel.error ?? "nil")")
         Group {
             if viewModel.isLoading && viewModel.libraries.isEmpty {
+                let _ = print("🔵 [LibrariesListView] Showing: ProgressView")
                 ProgressView("Cargando bibliotecas...")
             } else if let error = viewModel.error {
+                let _ = print("🔵 [LibrariesListView] Showing: ErrorView - \(error)")
                 ErrorView(message: error)
             } else if viewModel.libraries.isEmpty {
+                let _ = print("🔵 [LibrariesListView] Showing: emptyStateView")
                 emptyStateView
             } else {
+                let _ = print("🔵 [LibrariesListView] Showing: librariesList with \(viewModel.libraries.count) items")
                 librariesList
             }
         }
@@ -54,9 +59,12 @@ struct LibrariesListView: View {
         }
         .sheet(isPresented: $showCreateLibrary, onDismiss: {
             // Refresh libraries when sheet is dismissed
+            print("🔵 [LibrariesListView] Sheet dismissed, refreshing libraries")
             Task {
-                if let userId = authService.user?.id {
-                    await viewModel.refresh(for: userId)
+                if let userEmail = authService.user?.email,
+                   let token = authService.jwtToken {
+                    viewModel.setAuthToken(token)
+                    await viewModel.refresh(for: userEmail)
                 }
             }
         }) {
@@ -64,13 +72,25 @@ struct LibrariesListView: View {
                 .environmentObject(authService)
         }
         .task {
-            if let userId = authService.user?.id {
-                await viewModel.loadLibraries(for: userId)
+            print("🔵 [LibrariesListView] .task running")
+            print("🔵 [LibrariesListView] user: \(authService.user?.email ?? "nil")")
+            print("🔵 [LibrariesListView] jwtToken present: \(authService.jwtToken != nil)")
+            
+            // Use email as owner since backend stores libraries by email
+            if let userEmail = authService.user?.email,
+               let token = authService.jwtToken {
+                print("🔵 [LibrariesListView] Loading libraries for: \(userEmail)")
+                viewModel.setAuthToken(token)
+                await viewModel.loadLibraries(for: userEmail)
+            } else {
+                print("❌ [LibrariesListView] Missing user email or token!")
             }
         }
         .refreshable {
-            if let userId = authService.user?.id {
-                await viewModel.refresh(for: userId)
+            if let userEmail = authService.user?.email,
+               let token = authService.jwtToken {
+                viewModel.setAuthToken(token)
+                await viewModel.refresh(for: userEmail)
             }
         }
     }
@@ -150,7 +170,7 @@ struct LibrariesListView: View {
                             do {
                                 try await viewModel.deleteLibrary(library)
                             } catch {
-                                print("❌ Failed to delete library: \(error)")
+                                // Error is already handled in ViewModel
                             }
                         }
                     }
