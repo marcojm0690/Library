@@ -73,6 +73,9 @@ public class AuthController : ControllerBase
                 return BadRequest(new { error = "Failed to get user information", details = graphError });
             }
 
+            // Fetch profile photo URL from Microsoft Graph API
+            var profilePhotoUrl = await GetMicrosoftProfilePhotoUrlAsync(tokenResponse.AccessToken);
+
             // Find or create user
             var user = await _userRepository.GetByExternalIdAsync(userInfo.Id, "microsoft");
             if (user == null)
@@ -83,14 +86,15 @@ public class AuthController : ControllerBase
                     Provider = "microsoft",
                     Email = userInfo.Mail ?? userInfo.UserPrincipalName ?? "",
                     DisplayName = userInfo.DisplayName,
-                    ProfilePictureUrl = null // Could fetch from Graph API
+                    ProfilePictureUrl = profilePhotoUrl
                 };
                 user = await _userRepository.CreateAsync(user);
             }
             else
             {
-                // Update last login
+                // Update last login and profile picture
                 user.LastLoginAt = DateTime.UtcNow;
+                user.ProfilePictureUrl = profilePhotoUrl;
                 await _userRepository.UpdateAsync(user);
             }
 
@@ -266,18 +270,53 @@ public class AuthController : ControllerBase
         return (userInfo, null);
     }
 
+    private async Task<string?> GetMicrosoftProfilePhotoUrlAsync(string accessToken)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me/photos/48x48/$value");
+            request.Headers.Add("Authorization", $"Bearer {accessToken}");
+
+            var response = await _httpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                // Return the Graph API URL for the photo
+                // Note: This URL requires authentication, so we'll return a data URL or store the photo
+                var photoBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64Photo = Convert.ToBase64String(photoBytes);
+                return $"data:image/jpeg;base64,{base64Photo}";
+            }
+            
+            _logger.LogWarning("Failed to fetch profile photo: {StatusCode}", response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching profile photo from Microsoft Graph");
+            return null;
+        }
+    }
+
     private string GenerateJwtToken(User user)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]!));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claimsList = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email),
             new Claim("provider", user.Provider)
         };
+        
+        // Add profile picture URL if available
+        if (!string.IsNullOrEmpty(user.ProfilePictureUrl))
+        {
+            claimsList.Add(new Claim("profile_picture", user.ProfilePictureUrl));
+        }
+
+        var claims = claimsList.ToArray();
 
         var expirationDays = int.Parse(_configuration["Jwt:ExpirationDays"] ?? "30");
         var token = new JwtSecurityToken(

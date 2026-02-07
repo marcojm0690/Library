@@ -14,11 +14,44 @@ struct HomeView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Compact header
-                    VStack(spacing: 8) {
-                        Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.blue)
+                    // Compact header with user profile
+                    VStack(spacing: 12) {
+                        // User profile picture or initials
+                        Group {
+                            if let user = authService.user {
+                                if let photoUrlString = user.profilePictureUrl,
+                                   let photoUrl = URL(string: photoUrlString) {
+                                    // Display profile photo from URL
+                                    AsyncImage(url: photoUrl) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 70, height: 70)
+                                                .clipShape(Circle())
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(Color.white, lineWidth: 3)
+                                                )
+                                                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                                        case .failure(_), .empty:
+                                            // Fallback to initials
+                                            initialsView(for: user)
+                                        @unknown default:
+                                            initialsView(for: user)
+                                        }
+                                    }
+                                } else {
+                                    // No photo URL, show initials
+                                    initialsView(for: user)
+                                }
+                            } else {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 70))
+                                    .foregroundColor(.blue)
+                            }
+                        }
                         
                         if let userName = authService.user?.fullName {
                             Text(userName)
@@ -28,6 +61,12 @@ struct HomeView: View {
                             Text("Biblioteca Virtual")
                                 .font(.title3)
                                 .fontWeight(.bold)
+                        }
+                        
+                        if let userEmail = authService.user?.email {
+                            Text(userEmail)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
                     .padding(.top, 20)
@@ -184,6 +223,30 @@ struct HomeView: View {
             // Removed pre-loading libraries here to avoid duplicate API calls
             // Libraries are loaded in LibrariesListView when needed
         }
+    }
+    
+    /// Helper view to show initials in a gradient circle
+    private func initialsView(for user: User) -> some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 70, height: 70)
+            
+            Text(user.fullName.prefix(1).uppercased())
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.white)
+        }
+        .overlay(
+            Circle()
+                .stroke(Color.white, lineWidth: 3)
+        )
+        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
     }
 }
 

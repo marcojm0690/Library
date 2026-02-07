@@ -160,6 +160,7 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
         }
         
         let displayName = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as? String
+        let profilePictureUrl = json["profile_picture"] as? String
         
         // Store token and user info
         await MainActor.run {
@@ -167,7 +168,8 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
             self.user = User(
                 id: userId,
                 fullName: displayName ?? email,
-                email: email
+                email: email,
+                profilePictureUrl: profilePictureUrl
             )
             self.isAuthenticated = true
             
@@ -268,7 +270,8 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
                 self.user = User(
                     id: userInfo.id,
                     fullName: userInfo.displayName ?? userInfo.email,
-                    email: userInfo.email
+                    email: userInfo.email,
+                    profilePictureUrl: userInfo.profilePictureUrl
                 )
                 self.isAuthenticated = true
             }
@@ -297,11 +300,13 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
         }
         
         let displayName = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as? String
+        let profilePictureUrl = json["profile_picture"] as? String
         
         return User(
             id: userId,
             fullName: displayName ?? email,
-            email: email
+            email: email,
+            profilePictureUrl: profilePictureUrl
         )
     }
 
