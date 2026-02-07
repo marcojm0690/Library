@@ -162,6 +162,8 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
         let displayName = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as? String
         let profilePictureUrl = json["profile_picture"] as? String
         
+        print("📸 [Auth] Profile picture URL from processToken: \(profilePictureUrl?.prefix(100) ?? "nil")")
+        
         // Store token and user info
         await MainActor.run {
             self.jwtToken = token
@@ -301,6 +303,8 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
         
         let displayName = json["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] as? String
         let profilePictureUrl = json["profile_picture"] as? String
+        
+        print("📸 [Auth] Profile picture URL from JWT: \(profilePictureUrl?.prefix(100) ?? "nil")")
         
         return User(
             id: userId,
