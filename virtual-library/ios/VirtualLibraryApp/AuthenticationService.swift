@@ -78,7 +78,8 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "response_mode", value: "query"),
             URLQueryItem(name: "scope", value: "openid profile email User.Read"),
-            URLQueryItem(name: "state", value: state)
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "prompt", value: "select_account")  // Force account selection
         ]
         
         guard let authURL = components.url else {
@@ -316,10 +317,14 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
 
     /// Sign out and clear user state
     func signOut() {
+        print("🚪 [Auth] Signing out...")
         user = nil
         jwtToken = nil
         isAuthenticated = false
+        hasLoadedStoredAuth = false  // Reset so we can check auth again
+        BookApiService.shared.authToken = nil
         clearKeychainAuth()
+        print("🚪 [Auth] Sign out complete")
     }
     
     // MARK: - Keychain helpers
@@ -358,7 +363,8 @@ class AuthenticationService: NSObject, ObservableObject, AuthTokenProvider {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: "jwtToken"
         ]
-        SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(query as CFDictionary)
+        print("🔑 [Auth] Keychain delete status: \(status)")
     }
 }
 

@@ -237,9 +237,8 @@ struct HomeView: View {
                     )
                 )
                 .frame(width: 70, height: 70)
-            
             Text(user.fullName.prefix(1).uppercased())
-                .font(.system(size: 32, weight: .bold))
+                .font(.system(size: 32, weight: .bold)) 
                 .foregroundColor(.white)
         }
         .overlay(

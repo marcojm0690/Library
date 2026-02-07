@@ -274,20 +274,24 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me/photos/48x48/$value");
+            _logger.LogInformation("Attempting to fetch profile photo from Microsoft Graph API");
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me/photo/$value");
             request.Headers.Add("Authorization", $"Bearer {accessToken}");
 
             var response = await _httpClient.SendAsync(request);
+            _logger.LogInformation("Profile photo fetch response: {StatusCode}", response.StatusCode);
+            
             if (response.IsSuccessStatusCode)
             {
                 // Return the Graph API URL for the photo
                 // Note: This URL requires authentication, so we'll return a data URL or store the photo
                 var photoBytes = await response.Content.ReadAsByteArrayAsync();
                 var base64Photo = Convert.ToBase64String(photoBytes);
+                _logger.LogInformation("Profile photo fetched successfully, size: {Size} bytes", photoBytes.Length);
                 return $"data:image/jpeg;base64,{base64Photo}";
             }
             
-            _logger.LogWarning("Failed to fetch profile photo: {StatusCode}", response.StatusCode);
+            _logger.LogWarning("Failed to fetch profile photo: {StatusCode} - {ReasonPhrase}", response.StatusCode, response.ReasonPhrase);
             return null;
         }
         catch (Exception ex)
