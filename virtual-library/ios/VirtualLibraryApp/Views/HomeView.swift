@@ -225,6 +225,7 @@ struct HomeView: View {
         }
     }
     
+    
     /// Helper view to show initials in a gradient circle
     private func initialsView(for user: User) -> some View {
         ZStack {
