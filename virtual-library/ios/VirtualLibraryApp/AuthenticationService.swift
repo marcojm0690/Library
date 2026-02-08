@@ -373,10 +373,21 @@ extension AuthenticationService: ASWebAuthenticationPresentationContextProviding
     @MainActor
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         // Get the key window from the active scene - must be on main thread
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first {
-            return window
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            // First, try to return an existing window
+            if let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first {
+                return window
+            }
+            // If no existing window, create one with the window scene (iOS 26+)
+            if #available(iOS 26.0, *) {
+                return ASPresentationAnchor(windowScene: windowScene)
+            } else {
+                // For iOS < 26, use the deprecated init but suppress warning
+                return ASPresentationAnchor()
+            }
         }
+        
+        // Ultimate fallback: return a minimal anchor instead of crashing
         return ASPresentationAnchor()
     }
 }
