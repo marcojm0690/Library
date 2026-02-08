@@ -19,7 +19,10 @@ Virtual Library provides a seamless way to identify and catalog books using mode
 - 🔄 **Smart Caching** - Redis-based caching for improved performance
 - ☁️ **Azure-Powered** - Scalable cloud infrastructure with Cosmos DB
 - 🎨 **Modern UI** - Native iOS app built with SwiftUI
-- 🔒 **Secure** - Managed Identity authentication, no hardcoded credentials
+- 🔒 **Microsoft OAuth** - Secure authentication with Microsoft accounts
+- 👤 **User Profiles** - Profile photos from Microsoft Graph API
+- 📚 **Personal Libraries** - Create and manage multiple book collections
+- 💬 **Quote Management** - Save and organize favorite book quotes
 - 🐳 **Containerized** - Docker-based deployment with Azure Container Registry
 
 ## 📁 Repository Structure
@@ -67,35 +70,56 @@ Library/
 ### Technology Stack
 
 **Backend**
-- .NET 8 with Minimal APIs
+- .NET 10 with Minimal APIs
 - Clean Architecture pattern
 - Azure Cosmos DB (NoSQL)
 - Azure Redis Cache
 - Azure Computer Vision (OCR)
+- Microsoft Graph API (profile photos)
 - Docker containerization
 
 **Frontend**
 - SwiftUI (iOS 16+)
 - MVVM architecture
+- Microsoft OAuth authentication
 - AVFoundation (barcode scanning)
 - Vision framework (OCR)
 - Async/await networking
+- Keychain storage for JWT tokens
 
 **Infrastructure**
 - Azure App Service (Linux containers)
 - Azure Container Registry
 - Azure Cosmos DB (MongoDB API)
+- Azure Redis Cache
 - Azure Virtual Network
 - Bicep/ARM templates
 - Managed Identity authentication
+- GitHub Actions CI/CD
 
 ### API Endpoints
 
 ```
-POST /api/books/lookup              # Look up book by ISBN
-POST /api/books/search-by-cover     # Search books by OCR text
-GET  /api/libraries                 # List user libraries
-POST /api/quotes                    # Add book quotes
+# Authentication
+GET  /api/auth/config                # OAuth configuration
+POST /api/auth/oauth/microsoft       # Microsoft OAuth token exchange
+GET  /api/auth/me                    # Get current user info
+
+# Books
+POST /api/books/lookup               # Look up book by ISBN
+POST /api/books/search-by-cover      # Search books by OCR text
+
+# Libraries
+GET  /api/libraries                  # List user libraries
+POST /api/libraries                  # Create new library
+GET  /api/libraries/{id}             # Get library details
+PUT  /api/libraries/{id}             # Update library
+DELETE /api/libraries/{id}           # Delete library
+
+# Quotes
+GET  /api/quotes                     # List user quotes
+POST /api/quotes                     # Add book quote
+DELETE /api/quotes/{id}              # Delete quote
 ```
 
 ## 🚀 Getting Started
@@ -165,7 +189,15 @@ Create `appsettings.local.json` (see `appsettings.local.json.example`):
 
 ## ☁️ Azure Deployment
 
-### Quick Deploy
+### Deployment via GitHub Actions
+
+This project uses GitHub Actions for automated CI/CD:
+
+1. Push changes to the main branch
+2. GitHub Actions automatically builds and deploys to Azure
+3. View deployment status in the Actions tab
+
+### Manual Quick Deploy
 
 ```bash
 # 1. Provision Azure infrastructure
@@ -197,9 +229,12 @@ See [infrastructure/README.md](infrastructure/README.md) for detailed deployment
 
 - [Virtual Library App Documentation](virtual-library/README.md) - Complete app documentation
 - [Architecture Documentation](virtual-library/docs/architecture.md) - Detailed architecture guide
-- [API Contracts](virtual-library/shared/contracts/book-contracts.md) - API specifications
-- [Infrastructure Guide](infrastructure/README.md) - Azure deployment guide
-
+- [APicrosoft OAuth 2.0 for user authentication
+- ✅ JWT tokens with 30-day validity
+- ✅ Managed Identity for Azure resource authentication
+- ✅ ACR integration with RBAC (AcrPull role)
+- ✅ Cosmos DB access via Managed Identity
+- ✅ Secure Keychain storage for tokens
 ## 🔐 Security
 
 - ✅ Managed Identity for Azure resource authentication
