@@ -62,6 +62,7 @@ dotnet test --filter "FullyQualifiedName~Book_Initialization_SetsProperties"
 dotnet watch test
 ```
 
+
 ### Test Structure
 
 Tests are organized to mirror the application structure:
